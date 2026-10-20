@@ -1,7 +1,7 @@
 # OpenWrt 25.12 with Qualcomm NSS offload for ipq806x
 
-This repository contains OpenWrt **25.12.5** (Linux **6.12.94**, mac80211 backports
-6.18) with the Qualcomm **NSS** (Network Subsystem) hardware offload for the
+This repository contains OpenWrt **25.12.6** (Linux **6.12.112**, mac80211 backports
+6.18.55) with the Qualcomm **NSS** (Network Subsystem) hardware offload for the
 **ipq806x** platform (IPQ8064/IPQ8065). It targets the Netgear R7800 and the
 TP-Link Archer C2600.
 
@@ -13,7 +13,8 @@ The original OpenWrt README is kept as [README.openwrt.md](README.openwrt.md).
 ## Where this comes from
 
 - **Base:** upstream [openwrt/openwrt](https://github.com/openwrt/openwrt),
-  OpenWrt 25.12.5 (`r33051`).
+  OpenWrt 25.12.6 (`r33311`). The earlier 25.12.5 port is kept on the
+  `r7800-nss-25.12` branch.
 - **NSS support:** taken from the `r7800-24.10.8` branch of
   [tingalvin/r7800](https://github.com/tingalvin/r7800), which was written for
   OpenWrt 24.10. That branch is the work of Lucas Asvio (asvio), SqTER-PL and
@@ -27,7 +28,7 @@ The R7800 NSS builds go back several generations:
 ACwifidude/openwrt       R7800 NSS for OpenWrt 22.03 / 23.05 (kernel 5.10–5.15)
  └─ asvio/R7800-nss       fork: r7800-23.05-nss … r7800-24.10-nss, r7800-k6.x-nss
      └─ tingalvin/r7800   OpenWrt 24.10.4 … 24.10.8
-         └─ this repo     OpenWrt 25.12.5, Linux 6.12, + TP-Link Archer C2600
+         └─ this repo     OpenWrt 25.12.6, Linux 6.12, + TP-Link Archer C2600
 ```
 
 - [ACwifidude/openwrt](https://github.com/ACwifidude/openwrt): the original R7800
@@ -70,7 +71,14 @@ commit, so this branch descends from OpenWrt 25.12, not from the 24.10 fork.
 - **LuCI:** the VHT/QAM-256 on 2.4 GHz and NSS-load status patches are in
   `VHTNSS.zip`.
 - **Branding:** images are named `openwrt-nss-…` and report
-  `OpenWrt NSS 25.12.5`.
+  `OpenWrt NSS 25.12.6`.
+- **25.12.6 rebase:** two kernel patches were adapted to 6.12.112:
+  - the bridge Hy-Fi hook now uses `READ_ONCE(dst->dst)`;
+  - the bonding LAG acceleration was adapted to the RCU `port->aggregator`
+    and the new 802.3ad neighbour broadcast.
+
+  The new Aruba AP-32x has no switch, so it uses the swconfig `eth1`/`eth0`
+  layout.
 
 ### Fixes found while testing on the C2600
 
@@ -196,6 +204,19 @@ The final image showed:
   traffic in both directions. This is deliberate, for DSCP/QoS. Real
   bidirectional UDP such as QUIC is accelerated after a few packets. Purely
   one-way streams, such as `iperf3 -u -R`, stay on the CPU.
+
+### 25.12.6 check
+
+The measurements above were taken on 25.12.5. The 25.12.6 image was then
+installed on the C2600 with `sysupgrade`, keeping settings, and checked again:
+
+- clean kernel log;
+- all NSS fixes active;
+- WiFi TCP download 569–573 Mbit/s, upload 597 Mbit/s;
+- UDP download (one flow) 235 Mbit/s;
+- connection churn: 68,659 connections, 0 failures.
+
+The wired path was not re-measured.
 
 ### Not tested yet
 
