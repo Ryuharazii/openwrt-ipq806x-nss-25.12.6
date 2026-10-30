@@ -1,0 +1,156 @@
+--- a/nss_dynamic_interface.c
++++ b/nss_dynamic_interface.c
+@@ -16,7 +16,9 @@
+ 
+ #include "nss_tx_rx_common.h"
+ #include "nss_dynamic_interface_log.h"
+-#include "nss_dynamic_interface_stats.h"
++#include "nss_dynamic_interface_stats.h"
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
+ 
+ #define NSS_DYNAMIC_INTERFACE_COMP_TIMEOUT 60000	/* 60 Sec */
+ 
+@@ -30,11 +32,21 @@
+ /*
+  * Message data structure to store the message result
+  */
+-struct nss_dynamic_interface_msg_data {
+-	struct completion complete;	/* completion structure */
+-	int if_num;			/* Interface number */
+-	enum nss_cmn_response response;	/* Message response */
+-};
++struct nss_dynamic_interface_msg_data {
++	struct completion complete;	/* completion structure */
++	int if_num;			/* Interface number */
++	enum nss_cmn_response response;	/* Message response */
++};
++
++/*
++ * Protect callback lifetime after timeout without retaining heap allocations.
++ * Serialize synchronous requests and reject late responses via generation IDs.
++ */
++static DEFINE_MUTEX(nss_dynamic_interface_sync_mutex);
++static DEFINE_SPINLOCK(nss_dynamic_interface_sync_lock);
++static struct nss_dynamic_interface_msg_data nss_dynamic_interface_sync_data;
++static uint32_t nss_dynamic_interface_sync_generation;
++static bool nss_dynamic_interface_sync_pending;
+ 
+ static nss_dynamic_interface_assigned nss_dynamic_interface_assigned_types[NSS_CORE_MAX][NSS_MAX_DYNAMIC_INTERFACES]; /* Array of assigned interface types */
+ 
+@@ -128,19 +140,25 @@
+  * nss_dynamic_interface_callback
+  *	Callback to handle the message response from NSS FW.
+  */
+-static void nss_dynamic_interface_callback(void *app_data, struct nss_cmn_msg *ncm)
+-{
+-	struct nss_dynamic_interface_msg_data *di_data = (struct nss_dynamic_interface_msg_data *)app_data;
+-	struct nss_dynamic_interface_msg *ndim = (struct nss_dynamic_interface_msg *)ncm;
+-
+-	di_data->response = ncm->response;
+-	di_data->if_num = ndim->msg.alloc_node.if_num;
+-
+-	/*
+-	 * Unblock the sleeping function.
+-	 */
+-	complete(&di_data->complete);
+-}
++static void nss_dynamic_interface_callback(void *app_data, struct nss_cmn_msg *ncm)
++{
++	struct nss_dynamic_interface_msg_data *di_data = &nss_dynamic_interface_sync_data;
++	struct nss_dynamic_interface_msg *ndim = (struct nss_dynamic_interface_msg *)ncm;
++	uint32_t generation = (uint32_t)(unsigned long)app_data;
++
++	spin_lock_bh(&nss_dynamic_interface_sync_lock);
++	if (!nss_dynamic_interface_sync_pending ||
++	    generation != nss_dynamic_interface_sync_generation) {
++		spin_unlock_bh(&nss_dynamic_interface_sync_lock);
++		return;
++	}
++
++	nss_dynamic_interface_sync_pending = false;
++	di_data->response = ncm->response;
++	di_data->if_num = ndim->msg.alloc_node.if_num;
++	complete(&di_data->complete);
++	spin_unlock_bh(&nss_dynamic_interface_sync_lock);
++}
+ 
+ /*
+  * nss_dynamic_interface_tx()
+@@ -175,29 +193,53 @@
+  * nss_dynamic_interface_tx_sync()
+  *	Send the message to NSS and wait till we get an ACK or NACK for this msg.
+  */
+-static nss_tx_status_t nss_dynamic_interface_tx_sync(struct nss_ctx_instance *nss_ctx, struct nss_dynamic_interface_msg_data *di_data,
+-						     struct nss_dynamic_interface_msg *ndim)
+-{
+-	nss_tx_status_t status;
+-	int ret;
+-
+-	status = nss_dynamic_interface_tx(nss_ctx, ndim);
+-	if (status != NSS_TX_SUCCESS) {
+-		nss_warning("%px: not able to transmit msg successfully\n", nss_ctx);
+-		return status;
+-	}
+-
+-	/*
+-	 * Blocking call, wait till we get ACK for this msg.
+-	 */
+-	ret = wait_for_completion_timeout(&di_data->complete, msecs_to_jiffies(NSS_DYNAMIC_INTERFACE_COMP_TIMEOUT));
+-	if (ret == 0) {
+-		nss_warning("%px: Waiting for ack timed out\n", nss_ctx);
+-		return NSS_TX_FAILURE;
+-	}
+-
+-	return status;
+-}
++static nss_tx_status_t nss_dynamic_interface_tx_sync(struct nss_ctx_instance *nss_ctx, struct nss_dynamic_interface_msg_data *di_data,
++						     struct nss_dynamic_interface_msg *ndim)
++{
++	nss_tx_status_t status;
++	int ret = 0;
++
++	/*
++	 * This mutex serializes synchronous requests, while the token makes
++	 * out-of-order or timed-out callbacks harmless to the next request.
++	 */
++	mutex_lock(&nss_dynamic_interface_sync_mutex);
++	spin_lock_bh(&nss_dynamic_interface_sync_lock);
++	nss_dynamic_interface_sync_generation++;
++	if (!nss_dynamic_interface_sync_generation) {
++		nss_dynamic_interface_sync_generation++;
++	}
++	nss_dynamic_interface_sync_data.if_num = -1;
++	nss_dynamic_interface_sync_data.response = -1;
++	init_completion(&nss_dynamic_interface_sync_data.complete);
++	nss_dynamic_interface_sync_pending = true;
++	ndim->cm.app_data = (nss_ptr_t)(unsigned long)nss_dynamic_interface_sync_generation;
++	spin_unlock_bh(&nss_dynamic_interface_sync_lock);
++
++	status = nss_dynamic_interface_tx(nss_ctx, ndim);
++	if (status != NSS_TX_SUCCESS) {
++		nss_warning("%px: not able to transmit msg successfully\n", nss_ctx);
++		goto done;
++	}
++
++	ret = wait_for_completion_timeout(&nss_dynamic_interface_sync_data.complete,
++					  msecs_to_jiffies(NSS_DYNAMIC_INTERFACE_COMP_TIMEOUT));
++	if (!ret) {
++		nss_warning("%px: Waiting for ack timed out\n", nss_ctx);
++		status = NSS_TX_FAILURE;
++	}
++
++done:
++	spin_lock_bh(&nss_dynamic_interface_sync_lock);
++	if (ret) {
++		di_data->response = nss_dynamic_interface_sync_data.response;
++		di_data->if_num = nss_dynamic_interface_sync_data.if_num;
++	}
++	nss_dynamic_interface_sync_pending = false;
++	spin_unlock_bh(&nss_dynamic_interface_sync_lock);
++	mutex_unlock(&nss_dynamic_interface_sync_mutex);
++	return status;
++}
+ 
+ /*
+  * nss_dynamic_interface_alloc_node()
