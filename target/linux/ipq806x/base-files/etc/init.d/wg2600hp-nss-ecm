@@ -1,0 +1,10 @@
+#!/bin/sh /etc/rc.common
+# Preinstalled at build time; execute ECM on first boot after UCI defaults.
+START=96
+start() {
+    . /lib/functions.sh
+    [ "$(board_name)" = "nec,wg2600hp" ] || return 0
+    [ -d /sys/module/ecm ] && return 0
+    [ -x /etc/init.d/qca-nss-ecm ] || return 1
+    /etc/init.d/qca-nss-ecm start
+}

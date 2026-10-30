@@ -338,7 +338,9 @@ define Device/nec_wg2600hp
 	BOARD_NAME := wg2600hp
 	IMAGE/sysupgrade.bin := append-kernel | append-rootfs | \
 		pad-rootfs | append-metadata
-	DEVICE_PACKAGES := ath10k-firmware-qca99x0-ct
+	DEVICE_PACKAGES := ath10k-firmware-qca99x0-ct \
+		kmod-qca-nss-gmac kmod-qca-nss-drv kmod-qca-mcs \
+		kmod-qca-nss-ecm-standard kmod-qca-nss-drv-tunipip6
 endef
 TARGET_DEVICES += nec_wg2600hp
 

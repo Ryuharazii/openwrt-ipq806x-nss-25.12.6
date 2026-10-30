@@ -1,0 +1,8 @@
+#!/bin/sh
+. /lib/functions.sh
+if [ "$(board_name)" = "nec,wg2600hp" ] && [ -x /etc/init.d/qca-nss-ecm ]; then
+    uci -q set ecm.global.acceleration_engine='nss' || exit 1
+    uci -q commit ecm || exit 1
+    /etc/init.d/qca-nss-ecm enable || exit 1
+fi
+exit 0
