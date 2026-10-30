@@ -51,6 +51,7 @@ jobs:
 
       - name: Verify and stage WG2600HP images
         run: |
+          sh scripts/wg2600hp_nss_image_gate.sh
           mkdir -p out
           find bin/targets/ipq806x/generic -maxdepth 1 -type f -name '*nec_wg2600hp-*' -exec cp {} out/ \;
           test -n "$(find out -maxdepth 1 -type f -name '*.bin' -o -name '*initramfs*')"
