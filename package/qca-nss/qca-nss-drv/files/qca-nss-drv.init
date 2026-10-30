@@ -18,6 +18,13 @@
 START=70
 
 enable_rps() {
+	# IPQ8064 has two Linux CPUs: queue2/3 must use valid CPU affinity masks.
+	# Preserve existing upstream behavior for all other devices.
+	local mask_queue2=4 mask_queue3=8
+	if [ "$(board_name)" = "nec,wg2600hp" ]; then
+		mask_queue2=1
+		mask_queue3=2
+	fi
 	irq_nss_rps=`grep nss_queue1 /proc/interrupts | cut -d ':' -f 1 | tr -d ' '`
 	for entry in $irq_nss_rps
 	do
@@ -27,13 +34,13 @@ enable_rps() {
 	irq_nss_rps=`grep nss_queue2 /proc/interrupts | cut -d ':' -f 1 | tr -d ' '`
 	for entry in $irq_nss_rps
 	do
-		echo 4 > /proc/irq/$entry/smp_affinity
+		echo "$mask_queue2" > /proc/irq/$entry/smp_affinity
 	done
 
 	irq_nss_rps=`grep nss_queue3 /proc/interrupts | cut -d ':' -f 1 | tr -d ' '`
 	for entry in $irq_nss_rps
 	do
-		echo 8 > /proc/irq/$entry/smp_affinity
+		echo "$mask_queue3" > /proc/irq/$entry/smp_affinity
 	done
 
 	# Queue 0 of the second NSS core goes to the second CPU
