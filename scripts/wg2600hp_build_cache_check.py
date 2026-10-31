@@ -32,6 +32,8 @@ checks = {
         re.search(r"(?s)- name: Save compiler cache\n\s+if: always\(\)", yaml) is not None,
     "no full serial retry on every compiler failure":
         "make -j$(nproc) || make -j1 V=s" not in yaml,
+    "new builds queue instead of cancelling a running firmware build":
+        "cancel-in-progress: false" in yaml,
     "firmware output gate still executed":
         "sh scripts/wg2600hp_nss_image_gate.sh" in yaml,
     "kernel/target build directories never restored from stale cache":
