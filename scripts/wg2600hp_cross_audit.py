@@ -55,6 +55,8 @@ def main():
     image_verifier = read("scripts/wg2600hp_verify_embedded_dtb.py")
     device = read("target/linux/ipq806x/image/generic.mk")
     runtime = read("target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit")
+    mac80211 = read("package/kernel/mac80211/Makefile")
+    wifi_redirect = read("package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch")
 
     # 1. Catch the Linux return-value contract regression before boot.
     patches = ROOT.glob("target/linux/ipq806x/patches-6.12/*.patch")
@@ -129,7 +131,27 @@ def main():
         check("Network %s -> %s conduit" % (name, conduit),
               'ucidef_set_network_device_conduit "%s" "%s"' % (name, conduit) in block)
 
-    # 6. Verify the next downstream dependencies are not forgotten.
+    # 6. Keep NSS Wi-Fi redirect enabled, and rebuild mac80211 on a toggle.
+    # This is a source/config check, not evidence of actual Wi-Fi offload.
+    wifi_config = config.splitlines()
+    check("WG2600HP build selects NSS Wi-Fi redirect",
+          "CONFIG_NSS_DRV_WIFI_ENABLE=y" in wifi_config
+          and "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y" in wifi_config)
+    mac80211_deps = mac80211.split("PKG_CONFIG_DEPENDS:= ", 1)
+    mac80211_deps = mac80211_deps[1].split("\n\n", 1)[0] if len(mac80211_deps) == 2 else ""
+    check("mac80211 NSS option changes package configuration stamp",
+          "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT" in mac80211_deps)
+    check("mac80211 NSS virtual-interface redirect remains patched",
+          "CPTCFG_MAC80211_NSS_SUPPORT" in wifi_redirect
+          and "nss_virt_if_create_sync" in wifi_redirect
+          and "nss_virt_if_tx_buf" in wifi_redirect)
+    for idx in (0, 1):
+        radio = node(dts, r"&pcie_bridge" + str(idx))
+        check("WG2600HP PCIe Wi-Fi radio %d has NVMEM calibration" % idx,
+              'compatible = "qcom,ath10k";' in radio
+              and 'nvmem-cell-names = "mac-address", "pre-calibration";' in radio)
+
+    # 7. Verify the next downstream dependencies are not forgotten.
     for option in ("CONFIG_TARGET_ipq806x_generic_DEVICE_nec_wg2600hp",
                    "CONFIG_TARGET_ROOTFS_INITRAMFS",
                    "CONFIG_PACKAGE_kmod-qca-nss-gmac",
