@@ -87,3 +87,10 @@
 - **要確認・有力な差分**：vanilla Linux 6.12 QCA8Kドライバは原則 `DSA_TAG_PROTO_QCA` を使用し、旧 `qca-8021q` とは異なる。実機が現在 `qca` タグで稼働しているかを要確認。NSSファームウェアのレイヤ3処理やインターフェース識別に影響する**可能性**があるが、今回の `ipv4_create_requests=0` の確定原因とはまだ断言しない。
 - **別の有力確認事項**：ECMパッケージの `qca-nss-ecm.init` は `front_end_ipv4_stop` と `ecm.global.acceleration_engine` を参照する。停止フラグ、ECM connection_count、GMAC phys_if/DSA tagを実機で確認する。U-Boot操作はLinux側で指示しない。
 - **措置**：現行RAM試験を継続、追加ビルド・書き込み・過去のパッチの無条件移植は行わない。旧正常版との相違を検証してから最小修正を選択。
+
+## 2026-10-31 ECM接続数1の追加実機結果
+
+- 同じHetzner HTTPS Rangeの8,388,608-byteダウンロードは HTTP 206で成功。
+- OpenWrtで毎秒測定したECMの25回目の標本として、`ecm_db/connection_count=1`、`ecm_nss_ipv4/tcp_accelerated_count=0` が報告された。**ECMの接続DBは完全なゼロ状態ではない**。
+- 他の24回の標本・タイミング・このDB内接続が対象のTCP転送と一致するかは未確認。ECMが当該転送を管理したと断定しない。
+- 次はECM state dumpで接続の`can_accel`、`accel_mode`、プロトコル・インターフェースを確認する（ビルド不要）。標本未照合のままDSAタグ方式を原因と決め付けない。
