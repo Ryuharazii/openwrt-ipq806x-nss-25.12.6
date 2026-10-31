@@ -324,7 +324,7 @@
  	qcom,id = <1>;
  
 + 	qcom,pcs-chanid = <0>;
-+ 	qcom,phy-mdio-addr = <4>;	/* AKRO: 4->1 */
++ 	qcom,phy-mdio-addr = <32>;	/* DSA CPU fixed-link: no MDIO PHY */
 + 	qcom,poll-required = <0>;	/* AKRO: 0->1 */
 + 	qcom,rgmii-delay = <1>;		/* AKRO: 1->0 */
 + 	qcom,phy_mii_type = <0>;	/* AKRO: 0->8(PHY_INTERFACE_MODE_RGMII) */
@@ -350,7 +350,7 @@
  	qcom,id = <2>;
  
 + 	qcom,pcs-chanid = <1>;
-+ 	qcom,phy-mdio-addr = <0>;	/* AKRO: 0->0 */
++ 	qcom,phy-mdio-addr = <32>;	/* DSA CPU fixed-link: no MDIO PHY */
 + 	qcom,poll-required = <0>; /* no polling */
 + 	qcom,rgmii-delay = <0>;
 + 	qcom,phy_mii_type = <1>;	/* AKRO: 1->4(PHY_INTERFACE_MODE_SGMII) */
