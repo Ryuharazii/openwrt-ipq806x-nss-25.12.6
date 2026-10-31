@@ -19,6 +19,8 @@ FILES = (
     "package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch",
     "target/linux/ipq806x/image/generic.mk",
     "diff-wg2600hp-nss",
+    "package/kernel/mac80211/Makefile",
+    "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
     "target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit",
 )
 
@@ -63,6 +65,32 @@ class CrossAuditTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("FAIL Linux of_get_phy_mode return-value regression absent",
                       result.stdout)
+
+    def test_detects_missing_wifi_nss_build_config_dependency(self):
+        self.mutate(
+            "package/kernel/mac80211/Makefile",
+            "\\tCONFIG_PACKAGE_MAC80211_NSS_SUPPORT \\\\\\n",
+            "",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL mac80211 NSS option changes package configuration stamp",
+            result.stdout,
+        )
+
+    def test_detects_missing_wifi_nss_redirect_patch(self):
+        self.mutate(
+            "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
+            "nss_virt_if_create_sync",
+            "nss_virtual_interface_missing",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL mac80211 NSS virtual-interface redirect remains patched",
+            result.stdout,
+        )
 
     def test_detects_wrong_dsa_cpu_port_mode(self):
         self.mutate(
