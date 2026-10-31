@@ -33,7 +33,7 @@
 | G1: 起動からIPv4まで全経路を横断照合 | **未確認** | ソース静的検査 35/35 と回帰試験 5/5 はあるが、全経路が実機で成立する証拠ではない。旧ログで `qca8k ... CPU port 0 lacks required "phy-mode" property` / `probe ... error -22`。 |
 | G2: 修正後の後続処理・回帰を照合 | **未確認** | `of_get_phy_mode()` 戻り値破壊パッチ削除（6ee5909）・GMAC PHY無効化修正（ce2bedf）。修正版での全経路/実機検査は未実施。 |
 | G3: ビルド前の承認と証拠記録 | **未確認** | 旧ビルド #41178270721 は規則整備前に開始。現在のゲートを遡及してPASS扱いしない。新たなビルド開始禁止。 |
-| G4: 修正版ファームのビルド成功・成果物検証 | **未確認** | GitHub Actions #41178270721 は2026-10-31確認時点でビルド中、成果物なし。 |
+| G4: 修正版ファームのビルド成功・成果物検証 | **未確認（ビルド成功・基本検査のみPASS）** | 2026-10-31 GitHub Actions [#41178270721](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41178270721) は SUCCESS。initramfs-uImage 約8.5MiB・sysupgrade.bin 9,306,379 bytes を生成。旧 image gate の実DTB検査で NSS GMAC x2、NSS core x2、QCA8337・DSA port 0～6 のラベル、GMAC fixed-linkをPASS。アップロードZIP SHA256=41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929。ただしそのビルド時点の検査スクリプトは **実DTBのDSA CPU ethernet phandle、CPU phy-mode、CPU fixed-link、ユーザPHYの関連付け** まで検査せず、強化版チェックはこのイメージに未実施。実機RAM起動も未確認。 |
 | G5: WG2600HP RAM起動完了とWAN/LAN IPv4実通信 | **未確認** | 修正版のRAM起動結果なし。旧イメージはDSA初期化失敗。 |
 | G6: ECM/NSS IPv4加速と固定IPIP6オフロード実測 | **未確認** | 旧実機ではNSS IPv6 accelerated_count=0、tunipip6 statsなし。NSS firmware機能・TUNIPIP6 startup/teardown未実証。 |
 
