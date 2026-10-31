@@ -116,3 +116,12 @@
 - **直接の失敗条件候補**：同ファイル399–423行で、from/toインターフェース階層欠落、または先頭の `ae_interface_identifier<0` を検出するとルール生成を中止。後続のfrom/to階層で不正な複合インターフェース等も同じ失敗状態になる。**どの条件に該当したかは未確認**。
 - `classifiers.default.pr.accel=denied` は通信終了時のTCP状態や双方向パケット確認条件でも発生し得る。保存した状態が `FAIL_RULE` であることから、現段階では分類器を根本原因と断定しない。
 - **次のゲート**：ユーザー実機上に保存済みの `/tmp/ecm-state.txt` から serial 5の `from_interfaces` / `to_interfaces` にある `name`、`ae_interface_identifier`、`interface_count`、`nss_v4.ported` を抽出。NSSルール生成前のインターフェース識別問題を優先確認。追加TCP転送、ビルド、フラッシュ書き込みは不要。
+
+## 2026-10-31 NSS IPv4 FAIL_RULEの発火条件を実機・対象ソース双方で特定
+
+- **実機ECM Conn serial=5**：`from_interfaces` は `lan1` (AE=-1)、`br-lan` (AE=-1) の2段、`to_interfaces` は `wan` (AE=-1) の1段。`nss_v4.ported.can_accel=1`、`accel_mode=-2`。WAN/LAN IPv4通信自体は成功済み。
+- **適用元ECMソース 9acdcb05**：`frontends/nss/ecm_nss_ported_ipv4.c` 399–423行は `from_ifaces[from_ifaces_first]` と `to_ifaces[to_ifaces_first]` の AE IF番号を調べ、どちらか負数なら `ported_accel_bad_rule` (1442–1451行) に飛ぶ。`FAIL_RULE=-2` は `frontends/include/ecm_front_end_types.h` 165行で定義。実機値は**この失敗分岐の条件に一致**。ほかの要因が同時にある可能性は残る。
+- **同ECMソース**：`frontends/nss/ecm_nss_common.h` 67–82行は `nss_cmn_get_interface_number_by_dev(dev)` をそのまま呼び、`ecm_interface.c` の `ecm_interface_heirarchy_construct` は通常Ethernet (`lan1`・`wan`) で次のデバイスへの階層構築を終える。現行実機ダンプにはGMAC (`eth0/eth1`) が接続階層にない。
+- **現行カーネル設定**：`target/linux/ipq806x/config-6.12` 333行 `CONFIG_NET_DSA_TAG_QCA=y`、`CONFIG_NET_DSA_QCA8K=y`、別方式の `QCA_8021Q` 構成は確認できない。QCA8337 DSAの実機構成は `wan@eth0`・`lan1@eth1`。
+- **過去成功の再利用対象**（2026-10-25実機記録、現在はパッチの実体差分未取得）：WG2600HP IPQ8064 用 `package/kernel/qca-nss-ecm/patches/9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` とQCA8337 2CPU/802.1Qタグの`0031`修正。旧25.12.5で128MiB転送5回、NSS IPv4 `create_requests` 216→240、正しい通信量増加・invalid_ifnum0を確認。WG2600HP3 IPQ8062のP1パッチとは区別する。
+- **判断**：ECM DSAユーザーポート→NSS GMACのIF番号解決と、QCA8337のDSAタグ/VLAN分離を**一体として**比較・設計する必要がある。ユーザーポートのAE=-1を一律1/2に置き換えるだけの改変は禁止。25.12.6 Linux 6.12とのAPI/タグ機構適合、回帰・副作用を検証してから候補修正を作る。ビルド・実機書き込みは保留。
