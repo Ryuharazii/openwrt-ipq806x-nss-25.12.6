@@ -1,0 +1,238 @@
+From: WG2600HP isolated backport staging
+Subject: [PATCH 1/3] net: dsa: stage QCA8K 802.1Q tagger for Linux 6.12.112
+
+Stage only the 802.1Q tagger, protocol ID and Kconfig wiring.
+No device switches to it: QCA8K protocol selection, VLAN/FDB/ECM
+integration and dual-CPU isolation are NOT included in this patch.
+Do not enable CONFIG_NET_DSA_TAG_QCA_8021Q until the remaining
+backport is complete and validated.
+Reference: Stanislaw Pal's 6.18 implementation (2026-09-11).
+
+---
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -53,7 +53,8 @@
+ #define DSA_TAG_PROTO_RTL8_4T_VALUE		25
+ #define DSA_TAG_PROTO_RZN1_A5PSW_VALUE		26
+ #define DSA_TAG_PROTO_LAN937X_VALUE		27
+ #define DSA_TAG_PROTO_VSC73XX_8021Q_VALUE	28
++#define DSA_TAG_PROTO_QCA_8021Q_VALUE		29
+ 
+ enum dsa_tag_protocol {
+ 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
+@@ -84,7 +85,8 @@
+ 	DSA_TAG_PROTO_RTL8_4T		= DSA_TAG_PROTO_RTL8_4T_VALUE,
+ 	DSA_TAG_PROTO_RZN1_A5PSW	= DSA_TAG_PROTO_RZN1_A5PSW_VALUE,
+ 	DSA_TAG_PROTO_LAN937X		= DSA_TAG_PROTO_LAN937X_VALUE,
+ 	DSA_TAG_PROTO_VSC73XX_8021Q	= DSA_TAG_PROTO_VSC73XX_8021Q_VALUE,
++	DSA_TAG_PROTO_QCA_8021Q		= DSA_TAG_PROTO_QCA_8021Q_VALUE,
+ };
+ 
+ struct dsa_switch;
+--- a/net/dsa/Kconfig
++++ b/net/dsa/Kconfig
+@@ -125,7 +125,13 @@
+ 	  Say Y or M if you want to enable support for tagging frames for
+ 	  the Qualcomm Atheros QCA8K switches.
+ 
++config NET_DSA_TAG_QCA_8021Q
++	tristate "Tag driver for Qualcomm Atheros QCA8K switches, using VLAN"
++	help
++	  Say Y or M to tag QCA8K frames using 802.1Q VLAN tags
++	  instead of the proprietary Atheros header.
++
+ config NET_DSA_TAG_RTL4_A
+ 	tristate "Tag driver for Realtek 4 byte protocol A tags"
+ 	help
+ 	  Say Y or M if you want to enable support for tagging frames for the
+--- a/net/dsa/Makefile
++++ b/net/dsa/Makefile
+@@ -31,7 +31,8 @@
+ obj-$(CONFIG_NET_DSA_TAG_NONE) += tag_none.o
+ obj-$(CONFIG_NET_DSA_TAG_OCELOT) += tag_ocelot.o
+ obj-$(CONFIG_NET_DSA_TAG_OCELOT_8021Q) += tag_ocelot_8021q.o
+ obj-$(CONFIG_NET_DSA_TAG_QCA) += tag_qca.o
++obj-$(CONFIG_NET_DSA_TAG_QCA_8021Q) += tag_qca_8021q.o
+ obj-$(CONFIG_NET_DSA_TAG_RTL4_A) += tag_rtl4_a.o
+ obj-$(CONFIG_NET_DSA_TAG_RTL8_4) += tag_rtl8_4.o
+ obj-$(CONFIG_NET_DSA_TAG_RZN1_A5PSW) += tag_rzn1_a5psw.o
+--- /dev/null
++++ b/net/dsa/tag_qca_8021q.c
+@@ -0,0 +1,177 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (C) 2026 Stanislaw Pal <kuncy7@gmail.com>
++ *
++ * 802.1Q VLAN-based tag driver for the Qualcomm Atheros QCA8K switches,
++ * built on the tag_8021q framework: the source port travels in a VLAN tag
++ * the switch itself inserts, instead of the 2-byte Atheros header that
++ * only the switch and tag_qca understand. That keeps the conduit's frames
++ * plain 802.1Q, which any MAC - and any hardware in front of it - parses.
++ */
++#include <linux/dsa/8021q.h>
++#include <linux/if_vlan.h>
++#include <net/dsa.h>
++
++#include "tag.h"
++#include "tag_8021q.h"
++
++#define QCA_8021Q_NAME "qca-8021q"
++
++/* @dev's own 802.1Q upper with this VID, if any. Not the deep lookup:
++ * from a port without VLAN state of its own that climbs to the bridge
++ * and answers with the bridge's L3 VLAN interface.
++ */
++static struct net_device *qca_8021q_vlan_upper_of(struct net_device *dev,
++						 __be16 proto, u16 vid)
++{
++	struct net_device *upper;
++	struct list_head *iter;
++
++	netdev_for_each_upper_dev_rcu(dev, upper, iter) {
++		if (is_vlan_dev(upper) && vlan_dev_vlan_proto(upper) == proto &&
++		    vlan_dev_vlan_id(upper) == vid)
++			return upper;
++	}
++
++	return NULL;
++}
++
++/* Did an 802.1Q upper of this port tag the frame? The tag is hwaccel
++ * metadata, or - a user port offers no VLAN TX offload, so
++ * validate_xmit_vlan() pushes it in - already in the frame. A frame the
++ * bridge forwards (offload_fwd_mark) stays in the bridge's VLAN whatever
++ * it carries inside.
++ */
++static bool qca_8021q_upper_tagged(struct sk_buff *skb, struct net_device *netdev)
++{
++	u16 tci;
++
++	if (skb_vlan_tag_present(skb))
++		return !vid_is_dsa_8021q(skb_vlan_tag_get_id(skb));
++
++	if (skb->offload_fwd_mark || skb->protocol != htons(ETH_P_8021Q) ||
++	    __vlan_get_tag(skb, &tci))
++		return false;
++
++	tci &= VLAN_VID_MASK;
++	return !vid_is_dsa_8021q(tci) &&
++	       qca_8021q_vlan_upper_of(netdev, htons(ETH_P_8021Q), tci);
++}
++
++static struct sk_buff *qca_8021q_xmit(struct sk_buff *skb,
++				      struct net_device *netdev)
++{
++	struct dsa_port *dp = dsa_user_to_port(netdev);
++	u16 queue_mapping = skb_get_queue_mapping(skb);
++	u16 tx_vid = dsa_tag_8021q_standalone_vid(dp);
++	u8 pcp;
++
++	if (skb->offload_fwd_mark) {
++		unsigned int bridge_num = dsa_port_bridge_num_get(dp);
++		struct net_device *br = dsa_port_bridge_dev_get(dp);
++
++		/* A VLAN-aware bridge carries its own VID; the switch
++		 * forwards on that one.
++		 */
++		if (br_vlan_enabled(br))
++			return skb;
++
++		tx_vid = dsa_tag_8021q_bridge_vid(bridge_num);
++	}
++
++	/* An 802.1Q upper of the port (wan.35 for a PPPoE ISP, wan.99 next
++	 * to the port's place in a VLAN-unaware bridge) already tagged the
++	 * frame. The switch carries that VLAN as it is - the port and the
++	 * CPU port are tagged members of it (see qca8k_port_vlan_add) -
++	 * so send the frame with that tag alone instead of stacking the
++	 * port's standalone tag_8021q VID in front of it: a bridged port is
++	 * no longer a member of that VID and the switch would drop it.
++	 */
++	if (qca_8021q_upper_tagged(skb, netdev))
++		return skb;
++
++	pcp = netdev_txq_to_tc(netdev, queue_mapping);
++
++	return dsa_8021q_xmit(skb, netdev, ETH_P_8021Q,
++			      ((pcp << VLAN_PRIO_SHIFT) | tx_vid));
++}
++
++/* The user port that owns an 802.1Q upper with this VID, for a frame the
++ * switch delivered in a VLAN that is not a tag_8021q one. Such a VLAN is
++ * only ever installed for one port (qca8k_port_vlan_add refuses a second),
++ * so the first match is the only match.
++ */
++static struct net_device *qca_8021q_find_vlan_upper(struct net_device *conduit,
++						    __be16 proto, u16 vid)
++{
++	struct dsa_port *cpu_dp = conduit->dsa_ptr;
++	struct dsa_port *dp;
++
++	dsa_tree_for_each_user_port(dp, cpu_dp->dst) {
++		if (dp->cpu_dp != cpu_dp)
++			continue;
++		if (qca_8021q_vlan_upper_of(dp->user, proto, vid))
++			return dp->user;
++	}
++
++	return NULL;
++}
++
++static struct sk_buff *qca_8021q_rcv(struct sk_buff *skb,
++				     struct net_device *netdev)
++{
++	int src_port = -1, switch_id = -1, vbid = -1, vid = -1;
++
++	/* The conduit is promiscuous for the sake of the tag_8021q VIDs,
++	 * and a promiscuous MAC passes MAC control frames up as well. The
++	 * switch sends PAUSE at the CPU port whenever a slow user port
++	 * cannot drain what the CPU pushes; they carry no VLAN tag and
++	 * nothing above wants them.
++	 */
++	if (unlikely(eth_hdr(skb)->h_proto == htons(ETH_P_PAUSE)))
++		return NULL;
++
++	dsa_8021q_rcv(skb, &src_port, &switch_id, &vbid, &vid);
++
++	/* A VLAN that is not a tag_8021q one: dsa_8021q_rcv left its tag
++	 * on the skb as hwaccel metadata. It is the VLAN of an 802.1Q upper
++	 * of a port (the kernel's VLAN demux hands the frame to the upper
++	 * once we pick the port), or one of a VLAN-aware bridge, handed to
++	 * a port of that bridge which is in the VLAN. Which of the bridge's
++	 * ports the frame came from is not known - the same imprecise RX
++	 * as for a VLAN-unaware bridge - and the bridge does its own VLAN
++	 * handling on the tag.
++	 */
++	if (vid >= 0 && !vid_is_dsa_8021q(vid) && skb_vlan_tag_present(skb)) {
++		skb->dev = qca_8021q_find_vlan_upper(netdev, skb->vlan_proto, vid);
++		if (!skb->dev)
++			skb->dev = dsa_find_designated_bridge_port_by_vid(netdev, vid);
++	} else
++		skb->dev = dsa_tag_8021q_find_user(netdev, src_port, switch_id,
++						   vid, vbid);
++	if (!skb->dev) {
++		net_warn_ratelimited("%s: dropped frame from %pM proto 0x%04x: src_port=%d switch_id=%d vid=%d vbid=%d\n",
++				     netdev->name, eth_hdr(skb)->h_source,
++				     ntohs(eth_hdr(skb)->h_proto), src_port,
++				     switch_id, vid, vbid);
++		return NULL;
++	}
++
++	dsa_default_offload_fwd_mark(skb);
++
++	return skb;
++}
++
++static const struct dsa_device_ops qca_8021q_netdev_ops = {
++	.name			= QCA_8021Q_NAME,
++	.proto			= DSA_TAG_PROTO_QCA_8021Q,
++	.xmit			= qca_8021q_xmit,
++	.rcv			= qca_8021q_rcv,
++	.needed_headroom	= VLAN_HLEN,
++	.promisc_on_conduit	= true,
++};
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("DSA tag driver for Qualcomm Atheros QCA8K switches, using VLAN");
++MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_QCA_8021Q, QCA_8021Q_NAME);
++
++module_dsa_tag_driver(qca_8021q_netdev_ops);
