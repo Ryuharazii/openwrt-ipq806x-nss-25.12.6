@@ -107,3 +107,12 @@
 - 実機で `ecm_dump.sh ecm_db` は `exit_code=2`、出力0バイト。`/sys/kernel/debug/ecm/ecm_db/state_dev_major` は存在せず、`/sys/kernel/debug/ecm/ecm_state/state_dev_major` が存在。
 - リポジトリの `package/qca-nss/qca-nss-ecm/files/ecm_dump.sh` は **引数なし時に `ecm_state`** を既定使用し、指定モジュールの `state_dev_major` がないと `exit 2` となる。したがってこの試験失敗はECM状態ダンプの不正な引数指定に起因し、NSS/ECMの故障の根拠ではない。
 - 次回は実機 `ecm_dump.sh`（引数なし）で `/tmp/ecm-state.txt` を取得し、加速状態を確認する。不要な再ダウンロード・ビルドは行わない。
+
+## 2026-10-31 ECM状態ダンプで加速ルール生成失敗を特定（ソース照合済）
+
+- **実機**：`ecm_dump.sh`（引数なし）成功、約9,863B、HTTPダウンロードを表すTCP/443 conn serial 5 が存在。`is_routed=1`、NAT実施、接続バイト数も転送実績に整合（内部IP/MACは公開台帳に載せない）。
+- **実機の決定的値**：`conns.conn.5.nss_v4.ported.can_accel=1`、`conns.conn.5.nss_v4.ported.accel_mode=-2`、`driver_fail_total=0`、`classifiers.default.pr.accel=denied`。
+- **ECMパッケージが指定するソースコミット** `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa` と照合。該当ソース `frontends/include/ecm_front_end_types.h` 165行で `ECM_FRONT_END_ACCELERATION_MODE_FAIL_RULE = -2`（不正なルール情報による加速失敗）と定義。`frontends/nss/ecm_nss_ported_ipv4.c` 1442–1451行はルール生成失敗時に `ported_accel_bad_rule` 経由でこの状態を設定。`-1` は `FAIL_DENIED` のため、`-2` を単なるcan_accel拒否として扱ってはいけない。
+- **直接の失敗条件候補**：同ファイル399–423行で、from/toインターフェース階層欠落、または先頭の `ae_interface_identifier<0` を検出するとルール生成を中止。後続のfrom/to階層で不正な複合インターフェース等も同じ失敗状態になる。**どの条件に該当したかは未確認**。
+- `classifiers.default.pr.accel=denied` は通信終了時のTCP状態や双方向パケット確認条件でも発生し得る。保存した状態が `FAIL_RULE` であることから、現段階では分類器を根本原因と断定しない。
+- **次のゲート**：ユーザー実機上に保存済みの `/tmp/ecm-state.txt` から serial 5の `from_interfaces` / `to_interfaces` にある `name`、`ae_interface_identifier`、`interface_count`、`nss_v4.ported` を抽出。NSSルール生成前のインターフェース識別問題を優先確認。追加TCP転送、ビルド、フラッシュ書き込みは不要。
