@@ -53,6 +53,7 @@ def main():
     config = read("diff-wg2600hp-nss")
     image_gate = read("scripts/wg2600hp_nss_image_gate.sh")
     image_verifier = read("scripts/wg2600hp_verify_embedded_dtb.py")
+    wifi_elf_verifier = read("scripts/wg2600hp_verify_wifi_nss_binary.py")
     device = read("target/linux/ipq806x/image/generic.mk")
     runtime = read("target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit")
     mac80211 = read("package/kernel/mac80211/Makefile")
@@ -214,6 +215,12 @@ def main():
               "wpad-basic-mbedtls")))
     check("Image gate selects WG2600HP-specific package manifest",
           "'*-nec_wg2600hp.manifest'" in image_gate)
+    check("Image gate checks compiled Wi-Fi NSS ELF",
+          "wg2600hp_verify_wifi_nss_binary.py" in image_gate
+          and "lib/modules/6.12.112/mac80211.ko" in wifi_elf_verifier
+          and "lib/modules/6.12.112/qca-nss-drv.ko" in wifi_elf_verifier
+          and "__ksymtab_strings" in wifi_elf_verifier
+          and "nss_virt_if_tx_buf" in wifi_elf_verifier)
     check("Firmware gate inspects embedded *built* DTB",
           "wg2600hp_verify_embedded_dtb.py" in image_gate)
     check("Built DTB gate checks DSA CPU modes and conduits",
