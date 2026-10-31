@@ -59,6 +59,13 @@
 - SHA256 ZIP: `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。詳細台帳 `WG2600HP-EXECUTION-GATES.md`。
 - **残作業**: Wi-Fiの2.4/5GHz接続、NSS redirectの実機カウンタ増分、NSS IPv4 ECM/DSA問題、固定IPIP6。新規修正をコンパイルしたわけではない。**G3 FAIL、新規ビルド/書き込みは未実施**。
 
+## 2026-11-01 Wi-Fi NSSバイナリ検査：保存済みコードを本当に実行
+
+- GitHub隔離版 `scripts/wg2600hp_verify_wifi_nss_binary.py`（実行時blob `7b4c1cf9...`）をユーザー既存ZIP `WG2600HP-IPQ8064-25.12.6-NSS(20261031-134853).zip` に対して実行、**実バイナリ11/11 PASS、正常1＋故障注入6のPythonテスト7/7 PASS**。
+- アーキテクチャとカーネル版を誤検出しないよう、4つの `.ko` 全部にARM ELF32/6.12.112の検査を追加（`f234651bc5af7193099e982fbfa277e118d010c0`）、更新コードとGitHub読戻しはblob `8974cf86f50b31746d12e5e718ee8014c3d80507` で一致。更新後も実ZIPでPASS。
+- synthetic XZ/newc/uImageで **Python unittest 8/8 PASS**、GitHubの `tests/test_wg2600hp_wifi_nss_binary.py`（`149ee7a`）へ保存。手動CIのpreflightへ登録（`d807fbb`）。証拠は `WG2600HP-EXECUTION-GATES.md` の2026-11-01項目。
+- **完成ではない**: 新ファームのARMビルド、RAM起動、Wi-Fi NSSオフロード速度、ECM/DSA有線NSS、固定IPIP6 NSSは未解決。**G3 FAIL**。新規CIビルド・書込みは実施していない。これらの経緯は再説明不要。
+
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
