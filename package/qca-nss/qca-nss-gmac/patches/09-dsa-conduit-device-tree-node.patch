@@ -1,0 +1,17 @@
+--- a/ipq806x/nss_gmac_ctrl.c
++++ b/ipq806x/nss_gmac_ctrl.c
+@@ -1394,6 +1394,14 @@ static int32_t nss_gmac_probe(struct platform_device *pdev)
+ 	/* workaround for tplink,onhub eth0 phy_attach_direct panic with poll enabled */
+ 	SET_NETDEV_DEV(netdev, gmacdev->miibus->parent); /* (netdev, &pdev->dev) ? */
+ 
++#ifdef CONFIG_OF
++	/*
++	 * The parent is an MDIO bus, not the GMAC described by the DSA CPU port.
++	 * Expose the MAC's OF node so of_find_net_device_by_node() can find us.
++	 */
++	netdev->dev.of_node = pdev->dev.of_node;
++#endif
++
+ 	/*
+ 	 * Connect PHY
+ 	 */
