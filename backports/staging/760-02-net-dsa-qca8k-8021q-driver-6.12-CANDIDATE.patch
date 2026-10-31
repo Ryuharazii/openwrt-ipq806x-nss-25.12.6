@@ -111,7 +111,7 @@ Do not enable new tag protocol on real hardware.
  	case DSA_TAG_PROTO_QCA:
  		tagger_data = ds->tagger_data;
  
-@@ -1911,6 +1919,187 @@
+@@ -1911,6 +1919,190 @@
  	return 0;
  }
  
@@ -196,6 +196,7 @@ Do not enable new tag protocol on real hardware.
 +	struct qca8k_priv *priv = ds->priv;
 +	struct dsa_port *dp;
 +	struct net_device *saved_mgmt_conduit = NULL;
++	bool vlan_rollback_ok = true;
 +	int rollback_ret;
 +	int ret;
 +
@@ -280,16 +281,18 @@ Do not enable new tag protocol on real hardware.
 +restore_vlan:
 +	priv->tag_proto = DSA_TAG_PROTO_QCA;
 +	rollback_ret = qca8k_set_tag_8021q_vlan_mode(priv, false);
-+	if (rollback_ret)
++	if (rollback_ret) {
++		vlan_rollback_ok = false;
 +		dev_err(ds->dev, "QCA VLAN rollback failed: %d\n", rollback_ret);
++	}
 +restore_hdr:
 +	rollback_ret = qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_ALL);
 +	if (rollback_ret)
 +		dev_err(ds->dev, "QCA header rollback failed: %d\n", rollback_ret);
 +	mutex_lock(&priv->mgmt_eth_data.mutex);
 +	mutex_lock(&priv->mib_eth_data.mutex);
-+	/* Keep MDIO-only access if QCA header restoration failed. */
-+	if (!rollback_ret)
++	/* Keep MDIO-only access unless both VLAN and headers were restored. */
++	if (!rollback_ret && vlan_rollback_ok)
 +		priv->mgmt_conduit = saved_mgmt_conduit;
 +	mutex_unlock(&priv->mib_eth_data.mutex);
 +	mutex_unlock(&priv->mgmt_eth_data.mutex);
@@ -299,7 +302,7 @@ Do not enable new tag protocol on real hardware.
  static void qca8k_setup_hol_fixup(struct qca8k_priv *priv, int port)
  {
  	u32 mask;
-@@ -2121,6 +2310,13 @@
+@@ -2121,6 +2313,13 @@
  	/* HW learn on CPU port is limited and require manual setting */
  	ds->assisted_learning_on_cpu_port = true;
  
@@ -313,7 +316,7 @@ Do not enable new tag protocol on real hardware.
  	return 0;
  }
  
-@@ -2133,6 +2329,7 @@
+@@ -2133,6 +2332,7 @@
  
  static const struct dsa_switch_ops qca8k_switch_ops = {
  	.get_tag_protocol	= qca8k_get_tag_protocol,
@@ -321,7 +324,7 @@ Do not enable new tag protocol on real hardware.
  	.setup			= qca8k_setup,
  	.get_strings		= qca8k_get_strings,
  	.get_ethtool_stats	= qca8k_get_ethtool_stats,
-@@ -2162,6 +2359,9 @@
+@@ -2162,6 +2362,9 @@
  	.port_vlan_filtering	= qca8k_port_vlan_filtering,
  	.port_vlan_add		= qca8k_port_vlan_add,
  	.port_vlan_del		= qca8k_port_vlan_del,
