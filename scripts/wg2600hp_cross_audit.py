@@ -54,6 +54,7 @@ def main():
     image_gate = read("scripts/wg2600hp_nss_image_gate.sh")
     image_verifier = read("scripts/wg2600hp_verify_embedded_dtb.py")
     device = read("target/linux/ipq806x/image/generic.mk")
+    runtime = read("target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit")
 
     # 1. Catch the Linux return-value contract regression before boot.
     patches = ROOT.glob("target/linux/ipq806x/patches-6.12/*.patch")
@@ -149,6 +150,17 @@ def main():
     check("Built DTB gate checks DSA CPU modes and conduits",
           "checks['DSA CPU port %d mode and conduit' % port]" in image_verifier
           and "((0, 1, b'rgmii\\0'), (6, 2, b'sgmii\\0'))" in image_verifier)
+
+    check("Runtime audit covers full GMAC-DSA-WAN/LAN device graph",
+          "for dev in eth0 eth1 wan lan1 lan2 lan3 lan4" in runtime)
+    check("Runtime audit collects IPv4 and NSS outcomes",
+          "ip -4 route" in runtime
+          and "network.interface.wan status" in runtime
+          and "TUNIPIP6" in runtime)
+    check("Runtime audit has no interface mutation, flash or reboot commands",
+          not any(line.lstrip().startswith(("ip link set", "ifconfig ", "sysupgrade",
+                                           "mtd ", "flashcp ", "reboot", "fw_setenv"))
+                  for line in runtime.splitlines() if not line.lstrip().startswith("#")))
 
     failed = [label for label, ok in CHECKS if not ok]
     print("\nSTATIC CROSS-AUDIT %s (%d/%d)" %
