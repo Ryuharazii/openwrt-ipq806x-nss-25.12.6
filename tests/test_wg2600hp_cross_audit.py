@@ -19,6 +19,7 @@ FILES = (
     "package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch",
     "target/linux/ipq806x/image/generic.mk",
     "diff-wg2600hp-nss",
+    "target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit",
 )
 
 
