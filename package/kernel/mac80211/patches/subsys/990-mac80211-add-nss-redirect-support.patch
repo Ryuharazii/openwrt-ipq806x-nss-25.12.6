@@ -165,7 +165,7 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  	return 0;
 --- a/net/mac80211/rx.c
 +++ b/net/mac80211/rx.c
-@@ -2623,6 +2623,54 @@ static bool ieee80211_frame_allowed(stru
+@@ -2623,6 +2623,59 @@ static bool ieee80211_frame_allowed(stru
  	return true;
  }
  
@@ -197,10 +197,15 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
 +	if (!sdata->nssctx)
 +		goto out;
 +
-+	/* NSS expects ethernet header in skb data so resetting here */
++	/* NSS uses the Ethernet header stored in the skb headroom. */
++	if (unlikely(skb_headroom(skb) < ETH_HLEN))
++		goto out;
++
 +	skb_push(skb, ETH_HLEN);
 +	ret = nss_virt_if_tx_buf(sdata->nssctx, skb);
 +	if (ret) {
++		/* NSS did not take ownership: restore the original stack view. */
++		skb_pull(skb, ETH_HLEN);
 +		if (net_ratelimit()) {
 +			sdata_err(sdata, "NSS TX failed with error: %s\n",
 +				  nss_tx_status_str(ret));
@@ -220,7 +225,7 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  static void ieee80211_deliver_skb_to_local_stack(struct sk_buff *skb,
  						 struct ieee80211_rx_data *rx)
  {
-@@ -2663,10 +2711,14 @@ static void ieee80211_deliver_skb_to_loc
+@@ -2663,10 +2716,14 @@ static void ieee80211_deliver_skb_to_loc
  			ether_addr_copy(ehdr->h_dest, sdata->vif.addr);
  
  		/* deliver to local stack */
