@@ -45,6 +45,13 @@
 - **回帰対策**: cross_auditに正負検査（commit `36f5d845...`）、unittest異常ケース2件（`ef054fe505...`）。GitHub読戻し後、パッチ13ハンクの構造一致、JavaScriptで正常ケース1・境界検査欠落3ケースの判定を確認。**Python unittest / ARMコンパイル / Wi-Fi実機試験は未実施**。
 - **未解決を維持**: 参照した公開NSSドライバ実装は固定版 `3cfb9f43` と同一と証明できない。SKB所有権・mac80211 6.18.55バックポートへの実パッチ適用、Wi-Fi NSS高速化測定、有線DSA/ECM、固定IPIP6はいずれも未完。**G3 FAIL／ビルド禁止**。先に固定版ドライバのAPI契約を照合する。
 
+## 2026-11-01 Wi-Fi NSSを実イメージで照合（最新）
+
+- 提供済み `WG2600HP-IPQ8064-25.12.6-NSS(20261031-134853).zip` のresolved.configとmanifestを実際に読み、無線NSS・ath10k-ct・mac80211・ファームウェア・wpadの**10/10条件PASS**。FW削除・Wi-Fi NSS無効化の2負例をローカルで検出。**Wi-Fi NSS加速実機PASSではない**。
+- `mac80211 6.18.55` のLinux元ソースに、隔離版Wi-Fi NSSパッチのLinux対象**12/12ハンク文脈が一致**しメモリ上で展開できることを確認。`local-symbols`（backports由来）とOpenWrt先行パッチ適用後の実ソースはまだ未検証。コマンド `patch --dry-run` やARMコンパイルは未実施。
+- 画像ゲートにWi-Fi NSS設定とファームウェアを含む5設定＋5パッケージ条件、WG2600HP専用manifest選択を追加（`1456a6a...`）。`diff-wg2600hp-nss` にath10k-ct/mac80211の明示選択追加（`60e4c60...`）。cross-auditと3負例を拡張し、GitHub再取得のソース静的照合**14/14 PASS**。追記台帳 commit `83df4691bd7e456ce7fb29fbf464225e83bee9d2`。
+- **実ビルド・Wi-Fi接続・NSSパケット転送/統計値の検証は未実施、G3 FAIL維持**。有線IPv4 NSS・Wi-Fi NSS・固定IPIP6 NSSの完成目標は変更なし。ユーザーへの再アップロード要求は不要。
+
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
