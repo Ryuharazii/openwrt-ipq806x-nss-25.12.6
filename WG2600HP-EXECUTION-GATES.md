@@ -32,7 +32,7 @@
 | G0: 対象・履歴・失敗事項を把握 | PASS（記録範囲） | WG2600HP / IPQ8064 / 25.12.6。旧RAM起動はログイン到達だがQCA8K DSA probe失敗。 |
 | G1: 起動からIPv4まで全経路を横断照合 | **未確認（RAM起動～WAN DHCP・LAN構成の実機動作を確認）** | 2026-10-31、WG2600HP / 25.12.6 / kernel 6.12.112 / initramfsでログイン。NSS core 0/1 boot successfully、GMAC1/2 eth0/eth1初期化、QCA8337両CPU固定リンク 1Gbps、`DSA: tree 0 setup`、wan/lan1 1Gbpsリンク。WAN DHCP割当、LANアドレスとdefault routeを実機ログで確認。2026-10-31 WANからゲートウェイへICMP 3/3（0% loss）、外部IPv4 1.1.1.1へICMP 3/3（0% loss）、openwrt.org DNS A/AAAA応答を実機確認。2026-10-31 LAN側Ubuntu有線 eno1 からの経路 `via [WG2600HP LAN] dev eno1` を確認し、LANゲートウェイping 3/3、外部IPv4 1.1.1.1へのping 3/3、損失0%でLAN→WAN IPv4実パケット転送を実証。Boot ROM/U-Bootの全ログ、NSS加速、MTU処理は未確認。 |
 | G2: 修正後の後続処理・回帰を照合 | **未確認（DSA起動障害の解消を実機確認）** | `of_get_phy_mode()` 戻り値破壊パッチ削除（6ee5909）・GMAC PHY無効化修正（ce2bedf）の後、旧ログの `CPU port 0 lacks required "phy-mode"` / probe `-22` は観測されず、`DSA: tree 0 setup` と全5ユーザーポートのPHY検出を確認。一方で `eth0/eth1: error -22 setting MTU to 1502`、`qca8k ... nonfatal error -34` が残り、実データ通信時の影響は未判定。 |
-| G3: ビルド前の承認と証拠記録 | **未確認** | 旧ビルド #41178270721 は規則整備前に開始。現在のゲートを遡及してPASS扱いしない。新たなビルド開始禁止。 |
+| G3: ビルド前の承認と証拠記録 | **FAIL（証拠記録済み／ビルド不可）** | 2026-10-31の現行作業ブランチに対するビルド前検証記録を末尾に追記。G1の起動全経路照合とG2の変更後回帰が未完了。旧ビルド #41178270721 の成功を新規修正版PASSとみなさず、新たなビルドは禁止。 |
 | G4: 修正版ファームのビルド成功・成果物検証 | **未確認（ビルド成功・基本検査のみPASS）** | 2026-10-31 GitHub Actions [#41178270721](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41178270721) は SUCCESS。initramfs-uImage 約8.5MiB・sysupgrade.bin 9,306,379 bytes を生成。旧 image gate の実DTB検査で NSS GMAC x2、NSS core x2、QCA8337・DSA port 0～6 のラベル、GMAC fixed-linkをPASS。アップロードZIP SHA256=41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929。ただしそのビルド時点の検査スクリプトは **実DTBのDSA CPU ethernet phandle、CPU phy-mode、CPU fixed-link、ユーザPHYの関連付け** まで検査せず、強化版チェックはこのイメージに未実施。実機RAM起動も未確認。 |
 | G5: WG2600HP RAM起動完了とWAN/LAN IPv4実通信 | **PASS（RAM起動・DSA・WAN IPv4・DNS・LAN→WAN IPv4疎通、LAN側MTU1500）／NSS・経路全体のMTU未確認** | 2026-10-31 実機出力：`root@OpenWrt:~#`、`rootfs_type=initramfs`、`ip -br link` eth0/eth1 UP、wan@eth0 UP、lan1@eth1 UP、`br-lan` UP、`ifstatus wan` DHCP up、`ifstatus lan` up、IPv4 default route確認。WAN側からゲートウェイと外部IPv4へのping各3/3応答（損失0%）、DNSのA/AAAA回答、WANのRX/TX errors=0を確認。LAN側Ubuntu eno1の経路がWG2600HPのLAN側IPであることを確認して外部IPv4へping 3/3成功（損失0%）。Ubuntu `eno1` からWG2600HPのLANゲートウェイへDF設定、ICMP payload1472（IPv4合計1500 bytes）でping 3/3、損失0%を確認。LAN→WAN経路の1500バイト DF pingは失敗し、上流ゲートウェイから `Frag needed and DF set (mtu = 1460)` を受信。2026-10-31 Ubuntu `eno1` → WG2600HP → 1.1.1.1 のDF設定、ICMP payload1432（IPv4全長1460バイト）で3/3応答、損失0%を確認。NSS高速化、TCP/UDP転送速度は未確認。公開台帳には内部IP/MACを記録しない。 |
 | G6: ECM/NSS IPv4加速と固定IPIP6オフロード実測 | **FAIL（現行RAM版 IPv4 NSS高速化）／未確認（固定IPIP6）** | 実機LAN→WAN HTTPS HTTP 206/8MiB成功。ECM conn serial5ではFROM=lan1→br-lan、TO=wan、全AE IF=-1、`can_accel=1`、`accel_mode=-2 (FAIL_RULE)`。NSS IPv4 create_requests=0、RX/TX=0。適用元ECMソース（9acdcb05）では負のAE IF番号でルール生成を中止するため、これが直接の阻害条件と一致。追加でQCA8K標準タグ方式と8021Qタグの差分もある。固定IPIP6の実オフロードは未確認。別紙 `WG2600HP-NSS-IPv4-DSA-PORT-AUDIT.md` 参照。 |
@@ -125,3 +125,21 @@
 - **現行カーネル設定**：`target/linux/ipq806x/config-6.12` 333行 `CONFIG_NET_DSA_TAG_QCA=y`、`CONFIG_NET_DSA_QCA8K=y`、別方式の `QCA_8021Q` 構成は確認できない。QCA8337 DSAの実機構成は `wan@eth0`・`lan1@eth1`。
 - **過去成功の再利用対象**（2026-10-25実機記録、現在はパッチの実体差分未取得）：WG2600HP IPQ8064 用 `package/kernel/qca-nss-ecm/patches/9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` とQCA8337 2CPU/802.1Qタグの`0031`修正。旧25.12.5で128MiB転送5回、NSS IPv4 `create_requests` 216→240、正しい通信量増加・invalid_ifnum0を確認。WG2600HP3 IPQ8062のP1パッチとは区別する。
 - **判断**：ECM DSAユーザーポート→NSS GMACのIF番号解決と、QCA8337のDSAタグ/VLAN分離を**一体として**比較・設計する必要がある。ユーザーポートのAE=-1を一律1/2に置き換えるだけの改変は禁止。25.12.6 Linux 6.12とのAPI/タグ機構適合、回帰・副作用を検証してから候補修正を作る。ビルド・実機書き込みは保留。
+
+## 2026-10-31 ビルド前検証結果の確定記録
+
+対象：NEC WG2600HP (IPQ8064)、OpenWrt 25.12.6、Linux 6.12.112。現行ブランチ wg2600hp-nss-gmac-no-phy-20261031、検証起点HEAD 66c3f2ac109f55b1c274f1d30351f88d2c260ea1。WG2600HP3は別機種として混同しない。現時点で修正・新規ビルドは行っていない。
+
+| 経路・検証対象 | 判定 | 記録済み証拠と残件 |
+| --- | --- | --- |
+| 電源投入→Boot ROM→U-Boot | **未確認** | Boot ROM/U-Bootの全ログは未取得。過去のRAM起動成功はブート全経路の照合完了を意味しない。 |
+| Linux起動→NSS 2コア→GMAC→QCA8337 DSA初期化 | **旧RAM版でPASS／新修正版未確認** | 本台帳G1・G5の実機記録にinitramfsログイン、NSSコア2基、GMAC2基、DSA tree 0 setupを記載。 |
+| DTS→GMAC→DSA CPU0・6→WAN/LAN | **ソース照合済み／後続整合未確認** | target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts 157–216行：CPU0→gmac1 (eth0)、CPU6→gmac2 (eth1)、WAN port1、LAN port2–5。247–277行：GMAC1 id1、GMAC2 id2、fixed-link。既存RAM版ログのwan@eth0/lan1@eth1と一致。 |
+| QCA8K DSAタグ・2 CPUポート・FDB/VLAN | **未確認（互換性）** | target/linux/ipq806x/config-6.12 331–333行：QCA8K/DSA_TAG_QCA有効。既存pending-6.12/711-02は両CPUへのフラッド、711-03はconduit変更を扱う。公開6.18の802.1Q移植候補は素の6.12.112で33ハンク中7不一致（実OpenWrtソースへの適用試験ではない）。LAN/WAN分離と旧タグ方式との適合は未証明。 |
+| ECM起動・NSSドライバ設定 | **ソース照合済み／加速はFAIL** | package/qca-nss/qca-nss-ecm/files/qca-nss-ecm.init 24–31・55–57行：NSSフロントエンド選択・起動。diff-wg2600hp-nss 9–19行：NSS GMAC・DRV・ECM standard・TUNIPIP6有効。設定の存在は加速の実証ではない。 |
+| LAN→WAN IPv4通信 | **旧RAM版でPASS** | G5と本台帳TCP試験：WAN DHCP、外部疎通、HTTP 206/8,388,608 bytesを確認。ただしDSA MTU 1502設定時の-22/-34残留と後続影響は未確認。 |
+| ECM→NSS IPv4ルール生成 | **旧RAM版でFAIL** | 実機ECM serial5：FROM lan1(-1)→br-lan(-1)、TO wan(-1)、can_accel=1、accel_mode=-2 (FAIL_RULE)、NSS ipv4_create_requests=0、RX/TX=0。ECMソース9acdcb05の frontends/nss/ecm_nss_ported_ipv4.c 399–423行は負のAE IF番号で作成を中断、1442–1451行はFAIL_RULEへ。WG2600HP-NSS-IPv4-DSA-PORT-AUDIT.mdに根拠を保存済み。別の阻害条件の併存は未排除。 |
+| 固定IPIP6 NSSオフロード | **未確認** | TUNIPIP6有効化設定はあるがFW対応、IF確保・解放、実機加速は未証明。 |
+| 修正後の後続処理・回帰 | **未実施** | QCA8K/ECM修正パッチ未適用。CPU0/CPU6、VLAN、FDB、DHCP、MTU、NSS create/ACK、IPIP6停止解放は修正版で未試験。 |
+
+**規則4のビルド前判定：FAIL。** この記録を残すこととビルド許可は別。規則2の電源投入から通信までの横断確認は未合格、規則3の修正後回帰は未実施。旧25.12.5成功パッチ0031とECM 9999の原本も未取得であり、Linux6.12適合を証明できない。したがって新規ビルド・sysupgrade・完成宣言は禁止。既存CI成功を代用しない。
