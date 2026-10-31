@@ -44,6 +44,8 @@ jobs:
 
       - name: Cross-component static preflight
         run: |
+          sh -n target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit
+          test "$(git ls-files --stage target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit | awk '{print $1}')" = 100755
           python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py
           python3 scripts/wg2600hp_cross_audit.py
           python3 -m unittest discover -s tests -p 'test_wg2600hp_cross_audit.py' -v
