@@ -94,3 +94,10 @@
 - OpenWrtで毎秒測定したECMの25回目の標本として、`ecm_db/connection_count=1`、`ecm_nss_ipv4/tcp_accelerated_count=0` が報告された。**ECMの接続DBは完全なゼロ状態ではない**。
 - 他の24回の標本・タイミング・このDB内接続が対象のTCP転送と一致するかは未確認。ECMが当該転送を管理したと断定しない。
 - 次はECM state dumpで接続の`can_accel`、`accel_mode`、プロトコル・インターフェースを確認する（ビルド不要）。標本未照合のままDSAタグ方式を原因と決め付けない。
+
+## 2026-10-31 ECM接続数2への増加（追加試験）
+
+- UbuntuからのHetzner HTTPS 8,388,608-byte転送がHTTP 206で再度成功。
+- OpenWrt実機の報告では `front_end_ipv4_stop=0`、`ecm_db/connection_count=2`（前の試験報告値1から増加）。
+- この2件が当該TCPダウンロードの通信に対応するか、ECM/NSSのどの加速状態にあるかは**未確認**。過去に報告されたNSS IPv4統計は0のままだが、今回の転送と同時測定した新しい統計値はまだ取得していない。
+- 次は `ecm_dump.sh ecm_db` の接続状態と `front_end_selection` を読んで原因を絞る。NSS/DSAやECMのコード変更は保留。
