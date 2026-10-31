@@ -299,7 +299,7 @@ Do not enable new tag protocol on real hardware.
  static void qca8k_setup_hol_fixup(struct qca8k_priv *priv, int port)
  {
  	u32 mask;
-@@ -2121,6 +2285,13 @@
+@@ -2121,6 +2310,13 @@
  	/* HW learn on CPU port is limited and require manual setting */
  	ds->assisted_learning_on_cpu_port = true;
  
@@ -313,7 +313,7 @@ Do not enable new tag protocol on real hardware.
  	return 0;
  }
  
-@@ -2133,6 +2304,7 @@
+@@ -2133,6 +2329,7 @@
  
  static const struct dsa_switch_ops qca8k_switch_ops = {
  	.get_tag_protocol	= qca8k_get_tag_protocol,
@@ -321,7 +321,7 @@ Do not enable new tag protocol on real hardware.
  	.setup			= qca8k_setup,
  	.get_strings		= qca8k_get_strings,
  	.get_ethtool_stats	= qca8k_get_ethtool_stats,
-@@ -2162,6 +2334,9 @@
+@@ -2162,6 +2359,9 @@
  	.port_vlan_filtering	= qca8k_port_vlan_filtering,
  	.port_vlan_add		= qca8k_port_vlan_add,
  	.port_vlan_del		= qca8k_port_vlan_del,
