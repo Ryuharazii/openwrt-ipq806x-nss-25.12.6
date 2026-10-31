@@ -188,3 +188,12 @@
 **他の未解決**: 760-04/05 ECMのOpenWrt 400/401適用後のソース互換・ARMビルド、taggerの実コンパイル、GMAC/DMA/MTU 1502(-22)/port(-34)、双方向bridge/FDB、ECM CREATE/ACK、固定IPIP6、8021Q→QCA reverse-error復旧、実機RAM試験。
 
 **ゲート**: G1 未確認（追加横断確認必要）、G2 未確認（回帰証拠不足）、**G3 FAIL／新規ファームビルド禁止**、G4 未確認、G5 旧RAM版のみIPv4 PASS、G6 旧RAM版NSS IPv4 FAIL・固定IPIP6未確認。**43/43の文字列リプレイをpatch --dry-run PASSやARMビルドPASSと呼ばない。** GitHub Actions起動、ビルド、フラッシュは今回実施していない。
+
+## 2026-10-31 QCA8K VLAN 途中失敗のロールバック修正と再発防止
+
+- **原因（コード上で確認）**: 隔離 staging `760-02` の `qca8k_change_tag_protocol()` で `qca8k_set_tag_8021q_vlan_mode(priv, true)` が途中ポートで失敗すると、`restore_hdr` に直接ジャンプし `qca8k_set_tag_8021q_vlan_mode(priv, false)` を飛ばしていた。先行ポートのVLAN設定が中途半端に残る可能性がある。
+- **対処**: commit `f1888a9cf2c7eb80f619c17a9ecdc4214a7b4959` にて該当分岐を `goto restore_vlan` へ修正。Git blob `c7e306d496241d3d8d2a7f49c37625365b33002d`。変更は隔離stagingのみ。
+- **再発防止**: `tests/wg2600hp_qca8k_rollback_static.py` に途中失敗→`restore_vlan` を必須とする回帰アサーションを追加（commits `5ac7dfce3d7aa27aac634a81c41115d780814a10`, `4080050fddfb4775e438483b7fd3ef1aab8e1b47`）。
+- **修正後の読取検査**: GitHubから再取得した実パッチとDTS、ECM、dual-CPU候補、kernel設定で **11/11 項目 PASS（静的文字列照合）**。28/28 unified diffハンク行数・オフセットPASS。追加したPythonスクリプト自体の実行、patchツール適用、コンパイル、HW回帰は**未実施**。
+- **残リスク**: 巻戻し処理自体のハードウェア書込み失敗、8021Q→QCA逆方向切替途中の復旧不備、ECMとの統合、起動時タグ選択、WAN/LAN分離とRAM試験は未解決。
+- **G3判定: FAIL（ビルド禁止維持）**。新ファーム生成なし。旧RAM版のIPv4通信成功を今回修正のPASSに流用しない。
