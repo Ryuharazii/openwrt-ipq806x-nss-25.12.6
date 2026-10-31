@@ -125,6 +125,42 @@ def check(path):
             and any(name.startswith(entry[0] + '/fixed-link') for name in nodes)
         )
 
+    # Verify actual *compiled* DSA -> GMAC phandles and mode contracts.
+    # Merely checking the port labels would have missed the CPU link failure.
+    for port, mac_id, mode in ((0, 1, b'rgmii\0'), (6, 2, b'sgmii\0')):
+        port_path = switches[0][0] + '/ports/port@%d' % port if len(switches) == 1 else ''
+        cpu = nodes.get(port_path, {})
+        mac = gmacs.get(mac_id)
+        mac_props = mac[1] if mac is not None else {}
+        mac_phandle = mac_props.get('phandle', mac_props.get('linux,phandle'))
+        cpu_fixed = nodes.get(port_path + '/fixed-link', {})
+        mac_fixed = nodes.get(mac[0] + '/fixed-link', {}) if mac else {}
+        checks['DSA CPU port %d mode and conduit' % port] = (
+            cpu.get('phy-mode') == mode
+            and mac_props.get('phy-mode') == mode
+            and mac_phandle is not None
+            and cpu.get('ethernet') == mac_phandle
+        )
+        checks['DSA CPU port %d and GMAC%d 1000/full fixed link' % (port, mac_id)] = (
+            cpu_fixed.get('speed') == struct.pack('>I', 1000)
+            and 'full-duplex' in cpu_fixed
+            and mac_fixed.get('speed') == struct.pack('>I', 1000)
+            and 'full-duplex' in mac_fixed
+        )
+
+    # Confirm all user-port PHY references resolve to the expected MDIO PHYs.
+    for port in range(1, 6):
+        switch_path = switches[0][0] if len(switches) == 1 else ''
+        user = nodes.get(switch_path + '/ports/port@%d' % port, {})
+        phy = nodes.get(switch_path + '/mdio/phy@%d' % (port - 1), {})
+        phy_handle = phy.get('phandle', phy.get('linux,phandle'))
+        checks['DSA user port %d internal PHY binding' % port] = (
+            user.get('phy-mode') == b'internal\0'
+            and phy.get('reg') == struct.pack('>I', port - 1)
+            and phy_handle is not None
+            and user.get('phy-handle') == phy_handle
+        )
+
     for name, ok in checks.items():
         print('%s %s' % ('PASS' if ok else 'FAIL', name))
     if not all(checks.values()):
