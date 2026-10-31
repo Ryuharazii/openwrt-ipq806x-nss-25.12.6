@@ -252,3 +252,12 @@
 - **異常系試験3件も実行**: 既存ファームの取り出し結果からWi-Fiファームウェアを1件除外するとFAIL、NSSドライババイナリ中の `nss_virt_if_tx_buf` シンボル名を改変するとFAIL、uImage末尾データを破損させるとCRC FAIL。いずれも期待通り。
 - **自動ゲートへ反映**: 新規 `scripts/wg2600hp_verify_wifi_nss_binary.py`（commits `098ba94da7ee0d122af13ea9c886b9002943cd16`、`cd42c3cd1b3f01fa56ffd80f5ee3e0a26564632e`）を隔離ブランチに登録。`scripts/wg2600hp_nss_image_gate.sh` に組込み（`0c5c9d1bb93e40150cedb5c13edaf393fbb1dad6`）。cross_audit・回帰に検査組込み必須条件を追加（`6043cfefc7b6de20feac06f592a1d184376459ee`、`911d531b0d60eb5bae355ac4c986cbc89718b0cc`）。
 - **限界**: ローカルでは同等アルゴリズムのPython版を実行して陽性/陰性テストPASS。GitHubへ登録した正確なファイル内容は再取得・記述を照合済みだが、**隔離ブランチのスクリプトをCIで実行したわけではない**。既存の10/31イメージは新しいmac80211修正を含まない。Wi-Fi接続、NSSカウンタ/スループット、IPv4 DSA/ECM、固定IPIP6は依然未確認。G3 **FAIL**で新規ビルド・書き込みは未実施。
+
+## 2026-11-01 Wi-Fi NSS ELFゲート実行・ARM ABI検査を追加
+
+- **対象を固定**: WG2600HP (IPQ8064) / OpenWrt 25.12.6 / Linux **6.12.112**。過去に作成したGitHub隔離ブランチ版 `scripts/wg2600hp_verify_wifi_nss_binary.py` を現在の会話にマウント済みの実ZIP `WG2600HP-IPQ8064-25.12.6-NSS(20261031-134853).zip` に対して**今回実行**。Git blob SHA `7b4c1cf9b51c1717ade41f51cfa6347101e4ff88` がGitHub取得版とローカルファイルで一致した。
+- **実行した陽性試験**: 実uImage内の4モジュール・2無線FW、`mac80211.ko`から`qca-nss-drv.ko`への依存宣言、4つのNSS import/export対応を読込み **11/11 PASS**。異常注入6件（ペイロードCRC破損、uImage size破損、Wi-Fi FW欠落、NSS import欠落、NSS export欠落、依存宣言欠落）と正常検査を組み合わせ、**Python unittest 7/7 PASS**。これは従来の静的文字列チェックではなく実ZIPに対するPythonテスト実行結果。
+- **誤判定防止の修正**: 旧検査スクリプトはELFモジュール存在のみを検査し、他アーキテクチャ／不一致カーネル版の `.ko` を拒否できなかった。commit `f234651bc5af7193099e982fbfa277e118d010c0` で全4モジュールに `readelf -h` の **ARM/ELF32** と `.modinfo` の **vermagic=6.12.112** の照合を追加。4モジュールとも実ZIPでPASS。変更後のGit blob SHA `8974cf86f50b31746d12e5e718ee8014c3d80507` がローカル実行版とGitHub版で一致し、同じ実ZIPを再検査してPASS。
+- **独立した回帰テストをGitHubへ保存**: `tests/test_wg2600hp_wifi_nss_binary.py`（commit `149ee7a688be3fa0b4be0815298a15943c44c0a8`）は小さなnewc/XZ/uImageを合成するので実ファーム不要。正常ARM ELF、ZIP選択、CRC不良、Wi-Fi FW欠落、NSS公開API欠落、NSS module dependency欠落、ARMアーキテクチャ相違、vermagic相違の **Python unittest 8/8 PASS**。ローカルテストとGitHub読戻しはblob SHA `af9cf3a1d6e6e16286f7be03ed19eb8436f111e8` で一致。
+- **CIへの結線**: 手動起動ワークフロー `.github/workflows/build-wg2600hp-nss.yml` の静的preflight工程に上記unittestの実行を追加（commit `d807fbbda22ad068e14a677ad39464a4dd2d6527`）。GitHub Actions自体は起動していないため **CIでのテスト実行は未確認**。
+- **残る合格条件**: 新mac80211ソース・NSSドライバ・DSA/ECM統合の実コンパイル、RAM起動、2.4GHz/5GHzの接続、Wi-Fi NSS統計・速度、IPv4 NSS、固定IPIP6 NSSはいずれも **未確認/未達成**。**G3 FAILを維持**。隔離ブランチのテストのみ更新し、完成ファームや書込み許可と扱わない。
