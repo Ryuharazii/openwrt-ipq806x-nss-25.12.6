@@ -69,8 +69,8 @@ class CrossAuditTest(unittest.TestCase):
     def test_detects_missing_wifi_nss_build_config_dependency(self):
         self.mutate(
             "package/kernel/mac80211/Makefile",
-            "\\tCONFIG_PACKAGE_MAC80211_NSS_SUPPORT \\\\\\n",
-            "",
+            "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT",
+            "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT_REMOVED",
         )
         result = self.run_audit()
         self.assertNotEqual(result.returncode, 0)
