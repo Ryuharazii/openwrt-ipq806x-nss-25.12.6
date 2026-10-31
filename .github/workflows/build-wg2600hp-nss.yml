@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: wg2600hp-nss-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   wg2600hp:
