@@ -213,3 +213,11 @@
 - **検証**: v6.12.112元ソースへ既存760-03のunified-diff文脈を**JSで完全一致照合してメモリ上で再構築**、その結果に対し新760-06のunified-diffも**文脈一致**（`@@ -443,9 +443,12 @@`）。GitHubへコミット後読み戻して、既存760-02の28/28ハンクを含む**16/16のJS静的文字列・ハンク構造チェックPASS**。テスト追記: commit `914e7383924ff34c250c40978301185620d6ec66`。
 - **未検証を明示**: kernelの実パッチ適用（`patch --dry-run`を含む）・Python回帰テスト実行・ARMコンパイル・失敗注入・実機RAM起動・ネットワーク回帰は **未実施**。unregister処理自体のHW書き込み失敗は依然として残りうる。8021Q→QCA逆方向切替失敗、ECMのOpenWrt 400/401との統合、起動時タグ選択、Wi-Fi NSS redirectと固定IPIP6は未解決。
 - **ゲート**: G3 **FAIL**（未統合候補のみ、ビルド禁止維持）。稼働版と通常作業ブランチは変更なし。追加のユーザー用VLAN設定なし。
+
+## 2026-10-31 Wi-Fi NSS redirect再構成の欠落を修正（隔離）
+
+- **発見した具体的不整合**: `package/kernel/mac80211/Makefile` は `config-$(CONFIG_PACKAGE_MAC80211_NSS_SUPPORT) += MAC80211_NSS_SUPPORT` を使用するが、`PKG_CONFIG_DEPENDS` に同じ設定が未登録。`include/package.mk` の `STAMP_CONFIGURED` は `confvar,$(PKG_CONFIG_DEPENDS)` で決まり、NSS redirect設定の変更時に構成キャッシュが再生成されない可能性がある。
+- **実装修正**: 隔離ブランチ commit `be60ea7f698eb2b74e1fdd0b97a930ae2ba84eb8` で `PKG_CONFIG_DEPENDS` に `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT` を追加。適用先は `package/kernel/mac80211/Makefile` のみ。この変更は無線NSSの新規機能を実装するものではなく、既存のNSS redirectをビルド構成へ正しく伝えるためのもの。
+- **確認根拠**: 現行 `diff-wg2600hp-nss` に `CONFIG_NSS_DRV_WIFI_ENABLE=y` / `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y`、mac80211 `990` パッチに `nss_virt_if_create_sync` と `nss_virt_if_tx_buf`、WG2600HP DTSにPCIe Wi-Fi2台とNVMEM校正情報。既存 `scripts/wg2600hp_cross_audit.py` に5つのチェックを加え、`tests/test_wg2600hp_cross_audit.py` に2件の異常系回帰テストを追加。GitHub読み戻し7ファイルの **JS静的チェック11/11 PASS**（うち異常系2件）。Pythonテストは実行していない。
+- **影響と残リスク**: Wi-Fi mac80211の設定キャッシュの更新条件だけを拡張。無線実機接続、ath10k fwのロード、ECM、NSS redirectの統計値、同時有線通信は未計測。Wi-Fi完全オフロード対応を示すものではない。回帰確認は静的のみ。
+- **ゲート**: G1/G2に未確認事項あり、**G3 FAIL**を維持し通常ビルド・書込みは実行しない。ユーザー向けVLAN追加なし。
