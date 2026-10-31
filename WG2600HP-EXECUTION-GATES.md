@@ -143,3 +143,28 @@
 | 修正後の後続処理・回帰 | **未実施** | QCA8K/ECM修正パッチ未適用。CPU0/CPU6、VLAN、FDB、DHCP、MTU、NSS create/ACK、IPIP6停止解放は修正版で未試験。 |
 
 **規則4のビルド前判定：FAIL。** この記録を残すこととビルド許可は別。規則2の電源投入から通信までの横断確認は未合格、規則3の修正後回帰は未実施。旧25.12.5成功パッチ0031とECM 9999の原本も未取得であり、Linux6.12適合を証明できない。したがって新規ビルド・sysupgrade・完成宣言は禁止。既存CI成功を代用しない。
+
+## 2026-10-31 隔離バックポート rollback 修正・静的回帰判定
+
+**対象・変更範囲**: WG2600HP / IPQ8064 / OpenWrt 25.12.6 / Linux 6.12.112。作業対象は `wg2600hp-qca8021q-backport-isolated-20261031` の **staging patch 760-02のみ**。既存 `wg2600hp-nss-gmac-no-phy-20261031` およびデフォルトブランチ、稼働RAM版には未適用。
+
+**差分証拠**:
+- commit `814dbd9a6ce8b8239d499a93a07c0dfe2630fd76`: `760-02-net-dsa-qca8k-8021q-driver-6.12-CANDIDATE.patch` の QCA→8021Q 失敗後 `mgmt_conduit` 復旧、header/VLAN rollback エラー出力、8021Q→QCA 成功時の CPU0 管理 conduit 再設定を追加。
+- commit `5b0e9ee0f048efc11e5cd78cc05bed53c57588d3`: 上記拡張に合わせて以後3ハンクの new-file start offsets を更新。変更後 patch Git blob `22fd18a04dbb1b5bb4664a1ddab6f58f95e26fd6`。
+- commit `08ca8ae5fcac073ff447402f733ccda6f78aa936`: 再検査用 `tests/wg2600hp_qca8k_rollback_static.py` を追加（後続CI実行は未確認、保存のみ）。
+
+**このセッションで実施した読取検証（限定的PASS）**:
+- 28/28 unified diff hunks の old/new 行数・前後ハンク offset 一致。
+- `760-02` の QCAタグへ戻す成功経路で、CPU0 の conduit 状態更新呼出がある。
+- QCA→8021Q の途中失敗で保存した `mgmt_conduit` を復旧し、失敗した header rollback の場合は Ethernet管理を復旧扱いしない。
+- VLAN/header rollback 失敗ログの有無、`mgmt_eth_data` と `mib_eth_data` のロックを照合。
+- DTS QCA8337 CPU0→gmac1・CPU6→gmac2、dual-CPU VLAN候補の CPU割当、ECM候補の conduit 解決、現行 `CONFIG_NET_DSA_TAG_QCA=y` と新tagger未有効を横断照合。
+- 上記10件は **GitHubから取得した文字列に対する静的検査10/10** であり、追加した Python 検査スクリプトを Python 実行したとの主張ではない。
+
+**未解決・FAIL判定を維持**:
+1. 旧25.12.5 WG2600HP成功原本 `0031.patch` と ECM `9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` の本文未取得。
+2. `760-02` の 8021Q→QCA 切替途中で register/PVID操作が失敗した場合の完全な巻戻しが未実装。rollback関数自体の書き込み失敗や複数CPUポートの部分更新も未解決。
+3. `760-01` tagger、`760-02/03` switch/dual-CPU、`760-04/05` ECM の統合適用・Linux 6.12.112への patch dry-run・ARMコンパイル・データパス/FDB/VLAN回帰未確認。staging のまま。
+4. 電源投入→Boot ROM→U-Boot 全ログ照合、修正版RAM起動、IPv4/NSSオフロード、固定IPIP6実加速はいずれも未確認。
+
+**G1: 未確認、G2: 未確認、G3: FAIL（ビルド禁止）、G4: 未確認、G5: 既存RAM版IPv4 PASSのみ、G6: 既存RAM版NSS IPv4 FAIL／固定IPIP6未確認。** この作業ではファームビルド、GitHub Actions起動、sysupgrade、実機書き込みは実施していない。静的チェックの成功を完成宣言へ昇格させない。
