@@ -10,6 +10,7 @@ dts = (root / "target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq80
 cfg = (root / "target/linux/ipq806x/config-6.12").read_text()
 ecm = (root / "backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch").read_text()
 isolation = (root / "backports/staging/760-03-net-dsa-8021q-dual-cpu-vlan-isolation-6.12.patch").read_text()
+reg_cleanup = (root / "backports/staging/760-06-net-dsa-8021q-register-error-cleanup-6.12-CANDIDATE.patch").read_text()
 checks = []
 
 def check(name, ok):
@@ -81,6 +82,10 @@ check("QCA8337 CPU0/6 mappings",
       bool(re.search(r"port@6\s*\{[^}]*ethernet = <&gmac2>", dts, re.S)))
 check("two-CPU VLAN isolation staging", "dp == info->dp->cpu_dp" in isolation)
 check("ECM mapped to assigned conduit", "return dp->cpu_dp->conduit;" in ecm)
+check("registration failure unwinds partial tagger setup",
+      "err_free:\n-\tkfree(ctx);\n+" in reg_cleanup and
+      "+\tdsa_tag_8021q_unregister(ds);" in reg_cleanup and
+      "+++ b/net/dsa/tag_8021q.c" in reg_cleanup)
 check("8021Q not enabled in target", 
       "CONFIG_NET_DSA_TAG_QCA=y" in cfg and
       not re.search(r"^CONFIG_NET_DSA_TAG_QCA_8021Q=[ym]$", cfg, re.M))
