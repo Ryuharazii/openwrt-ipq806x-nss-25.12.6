@@ -39,6 +39,12 @@
 - **回帰検証**: cross auditと2つの負例を追加（`a13a3a3`, `b25a6dd`）、GitHub取得したソースで JS静的照合 **6/6 PASS**。Python実行・patch実適用・コンパイル・Wi-Fi/NSS実機計測は未完。**G3 FAILのままでビルド・書込み禁止**。
 - **次の優先順位**: pinned NSS driverのpacket ownership契約とmac80211 6.18.55バックポート適合性を追加確認し、DSA/ECM/起動時タグ切替と同時にWi-Fiを検証すること。新規VLANユーザー設定不要。
 
+## 2026-11-01 Wi-Fi NSS TX QoS線形ヘッダー検査（最新修正）
+
+- **隔離版の実変更**: commit `2ecd8c2536a77ba2e7ad81a9e0758207b4ea45b6`。mac80211 NSS `ieee80211_xmit_nss_fixup()` が送信前の短い／非線形skbでEthernet/IPv4/IPv6ヘッダーへ無条件アクセスしないよう `skb_headlen` の長さ検査を追加。`990-mac80211-add-nss-redirect-support.patch` に保存、通常作業ブランチには未統合。
+- **回帰対策**: cross_auditに正負検査（commit `36f5d845...`）、unittest異常ケース2件（`ef054fe505...`）。GitHub読戻し後、パッチ13ハンクの構造一致、JavaScriptで正常ケース1・境界検査欠落3ケースの判定を確認。**Python unittest / ARMコンパイル / Wi-Fi実機試験は未実施**。
+- **未解決を維持**: 参照した公開NSSドライバ実装は固定版 `3cfb9f43` と同一と証明できない。SKB所有権・mac80211 6.18.55バックポートへの実パッチ適用、Wi-Fi NSS高速化測定、有線DSA/ECM、固定IPIP6はいずれも未完。**G3 FAIL／ビルド禁止**。先に固定版ドライバのAPI契約を照合する。
+
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
