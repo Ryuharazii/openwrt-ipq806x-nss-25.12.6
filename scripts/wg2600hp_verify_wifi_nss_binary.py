@@ -121,6 +121,10 @@ def main(path):
         nss.write_bytes(files[MODULES[1]])
         macsyms = readelf(mac, '-Ws')
         exports = readelf(nss, '-p', '__ksymtab_strings')
+        modinfo = readelf(mac, '-p', '.modinfo')
+        if not re.search(r'\bdepends=[^\n]*qca-nss-drv', modinfo):
+            raise ValueError('mac80211 does not declare qca-nss-drv module dependency')
+        print('PASS mac80211 module depends on qca-nss-drv')
         for symbol in REQUIRED:
             imported = re.search(r'\bGLOBAL\s+DEFAULT\s+UND\s+' +
                                  re.escape(symbol) + r'\s*$', macsyms, re.M)
