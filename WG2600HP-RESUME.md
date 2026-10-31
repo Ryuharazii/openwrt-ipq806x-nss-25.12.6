@@ -52,6 +52,13 @@
 - 画像ゲートにWi-Fi NSS設定とファームウェアを含む5設定＋5パッケージ条件、WG2600HP専用manifest選択を追加（`1456a6a...`）。`diff-wg2600hp-nss` にath10k-ct/mac80211の明示選択追加（`60e4c60...`）。cross-auditと3負例を拡張し、GitHub再取得のソース静的照合**14/14 PASS**。追記台帳 commit `83df4691bd7e456ce7fb29fbf464225e83bee9d2`。
 - **実ビルド・Wi-Fi接続・NSSパケット転送/統計値の検証は未実施、G3 FAIL維持**。有線IPv4 NSS・Wi-Fi NSS・固定IPIP6 NSSの完成目標は変更なし。ユーザーへの再アップロード要求は不要。
 
+## 2026-11-01 Wi-Fi NSSを実バイナリで検証（最重要引継ぎ）
+
+- ユーザー既存ZIP `WG2600HP-IPQ8064-25.12.6-NSS(20261031-134853).zip` から実uImage→内蔵XZカーネル→newc initramfsを展開し、ARM ELF `mac80211.ko` と `qca-nss-drv.ko` を直接検査。**mac80211からNSS仮想IFの4 APIがimportされ、NSS drv側は4 APIを `__ksymtab_strings` にexport**。mac80211のmodinfoにも `depends=qca-nss-drv` がある。ath10k_core/pciとQCA99X0 fw・boardも収録。実行10/10項目PASS＋依存照合PASS。実ファームのWi-Fi NSS redirect組込みを確認、**実機でWi-Fi NSS高速化成功と扱わない**。
+- 実データへ異常注入して3ケース（無線fw欠落、NSS export名変更、uImage CRC破損）を想定どおりFAIL検出。検査ロジックを `scripts/wg2600hp_verify_wifi_nss_binary.py` としてGitHub隔離ブランチへ追加（`098ba94`, `cd42c3c`）、イメージゲートに接続（`0c5c9d1`）。前段ソース監査と欠落検出テストも追加（`6043cfe`, `911d531`）。
+- SHA256 ZIP: `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。詳細台帳 `WG2600HP-EXECUTION-GATES.md`。
+- **残作業**: Wi-Fiの2.4/5GHz接続、NSS redirectの実機カウンタ増分、NSS IPv4 ECM/DSA問題、固定IPIP6。新規修正をコンパイルしたわけではない。**G3 FAIL、新規ビルド/書き込みは未実施**。
+
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
