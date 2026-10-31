@@ -221,3 +221,10 @@
 - **確認根拠**: 現行 `diff-wg2600hp-nss` に `CONFIG_NSS_DRV_WIFI_ENABLE=y` / `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y`、mac80211 `990` パッチに `nss_virt_if_create_sync` と `nss_virt_if_tx_buf`、WG2600HP DTSにPCIe Wi-Fi2台とNVMEM校正情報。既存 `scripts/wg2600hp_cross_audit.py` に5つのチェックを加え、`tests/test_wg2600hp_cross_audit.py` に2件の異常系回帰テストを追加。GitHub読み戻し7ファイルの **JS静的チェック11/11 PASS**（うち異常系2件）。Pythonテストは実行していない。
 - **影響と残リスク**: Wi-Fi mac80211の設定キャッシュの更新条件だけを拡張。無線実機接続、ath10k fwのロード、ECM、NSS redirectの統計値、同時有線通信は未計測。Wi-Fi完全オフロード対応を示すものではない。回帰確認は静的のみ。
 - **ゲート**: G1/G2に未確認事項あり、**G3 FAIL**を維持し通常ビルド・書込みは実行しない。ユーザー向けVLAN追加なし。
+
+## 2026-10-31 Wi-Fi NSS redirect送信拒否時のskb復旧
+
+- **修正前に照合したデータパス**: WG2600HP PCIe ath10k → mac80211 RX `netif_rx_nss` → `nss_virt_if_tx_buf` → NSS。非対応パケット・NSS無効・インターフェース異常で `nss_virt_if_tx_buf` がエラーを返す経路を公開QCA NSSドライバ `nss_virt_if.c` のソースで確認。mac80211 `990-mac80211-add-nss-redirect-support.patch` はNSS転送直前に `skb_push(skb, ETH_HLEN)` でヘッダーを広げるが、エラー時に戻さず通常スタックへ渡していた。通常処理のフレーム境界を破壊する可能性。
+- **実際の修正**: 隔離ブランチの `package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch` を commit `309210e2e23e7eb01e6f101aa70861bbbaff5b69` で更新。`skb_headroom(skb) < ETH_HLEN` なら従来スタックへ直接渡す。NSS送信エラー時に `skb_pull(skb, ETH_HLEN)` でデータ位置を戻す。NSS送信成功時の処理は変更なし。
+- **回帰検知**: `scripts/wg2600hp_cross_audit.py` にヘッダー復旧・headroom検査を追加（commit `a13a3a3c50fec5457d4d32f8b099776958427296`）、`tests/test_wg2600hp_cross_audit.py` にそれぞれを欠落させた2つの異常系テスト（commit `b25a6ddd1c055ba8bcce43b2953194f927615ac2`）。GitHubから実際の3ファイルを読み直し、**patch hunk 13件の行数と前後offset一致／不変条件・負例の合計6/6 JS静的検査PASS**。この結果はソース構造検査であり、動作試験を意味しない。
+- **未解決**: pinned NSSドライバ版での全エラーパスのパケット所有権、実コンパイル、Wi-Fi通信への影響、Wi-Fi NSS統計の増分、有線ECM/DSA/固定IPIP6、実機RAM試験は未確認。**G3 FAIL、ビルド禁止・書込み禁止維持**。ユーザー用VLAN設定を増やさない。
