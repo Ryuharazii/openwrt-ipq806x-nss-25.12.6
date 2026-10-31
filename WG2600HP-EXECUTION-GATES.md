@@ -228,3 +228,11 @@
 - **実際の修正**: 隔離ブランチの `package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch` を commit `309210e2e23e7eb01e6f101aa70861bbbaff5b69` で更新。`skb_headroom(skb) < ETH_HLEN` なら従来スタックへ直接渡す。NSS送信エラー時に `skb_pull(skb, ETH_HLEN)` でデータ位置を戻す。NSS送信成功時の処理は変更なし。
 - **回帰検知**: `scripts/wg2600hp_cross_audit.py` にヘッダー復旧・headroom検査を追加（commit `a13a3a3c50fec5457d4d32f8b099776958427296`）、`tests/test_wg2600hp_cross_audit.py` にそれぞれを欠落させた2つの異常系テスト（commit `b25a6ddd1c055ba8bcce43b2953194f927615ac2`）。GitHubから実際の3ファイルを読み直し、**patch hunk 13件の行数と前後offset一致／不変条件・負例の合計6/6 JS静的検査PASS**。この結果はソース構造検査であり、動作試験を意味しない。
 - **未解決**: pinned NSSドライバ版での全エラーパスのパケット所有権、実コンパイル、Wi-Fi通信への影響、Wi-Fi NSS統計の増分、有線ECM/DSA/固定IPIP6、実機RAM試験は未確認。**G3 FAIL、ビルド禁止・書込み禁止維持**。ユーザー用VLAN設定を増やさない。
+
+## 2026-11-01 Wi-Fi NSS QoS送信ヘッダーの境界検査
+
+- **元ソースと実コードを横断確認**: `mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch` の `ieee80211_xmit_nss_fixup()` は `ieee80211_subif_start_xmit_8023()` が `skb->len < ETH_HLEN` を判定する**前**に呼び出され、Ethernet/IPv4/IPv6ヘッダーを境界検査なしで参照していた。短い・非線形のskbで不正参照し得る。`CPTCFG_MAC80211_NSS_SUPPORT` が有効な場合のみ到達する分岐。
+- **修正を隔離ブランチに実保存**: commit `2ecd8c2536a77ba2e7ad81a9e0758207b4ea45b6`。Ethernet最小線形長 `skb_headlen(skb) >= ETH_HLEN` を先に確認。IPv4は `ETH_HLEN + sizeof(struct iphdr)`、IPv6は `ETH_HLEN + sizeof(struct ipv6hdr)` の線形長を満たす場合にだけQoSを読み取る。正常で十分な長さのパケットのQoS処理は変更しない。
+- **再発検出の追加**: `scripts/wg2600hp_cross_audit.py` に各読み取りより前の境界検査を確認するチェックを追加（commit `36f5d84540b5de3518c8f12a4a116a67f3eed306`）、`tests/test_wg2600hp_cross_audit.py` にEthernet/IPv6検査の欠落を検出する負例を追加（commit `ef054fe505270e15425fbef6e0039413ff00345b`）。GitHubから再取得したmac80211パッチ13/13ハンクの行数/オフセット一致、JSで正常ケースとEthernet/IPv4/IPv6境界検査を消した3負例を評価し **正常1件PASS、負例3件を正しくFAIL**。これはソース構造の限定的検証。Pythonテストの実行、patchの実適用、ARMビルド、実機Wi-Fiテストは未実施。
+- **NSSドライバ契約確認**: 別公開リビジョンの `nss_virt_if_tx_buf()` から `nss_core_send_packet()` まで確認。送信拒否の場合はSKBを解放せずエラーを返す経路が存在し、以前追加した `skb_pull` によるエラー時スタック復帰と整合する。ただし実際のビルドが固定している `qca-nss-drv 3cfb9f43` の完全なソース・DMA失敗経路・全エラーパスは未照合であり所有権の最終判定は保留。
+- **ゲート**: G3は引き続き **FAIL**。現行通常ブランチと書き込み対象ファームには未導入。Wi-Fi NSSの実機高速化、LAN/WANのNSS IPv4、固定IPIP6はいずれも未達成。ユーザー用VLAN追加不要。
