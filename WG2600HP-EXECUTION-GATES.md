@@ -72,3 +72,10 @@
 - Ubuntuの有線経路が `via WG2600HP LAN dev eno1` であることは確認。
 - `curl` に指定した `speed.cloudflare.com/__down?bytes=...` は HTTP 403 を返し、ダウンロード本体は 0 バイト。NSS加速の有無は**未判定**とする。403応答自体の短いTCP通信はあり得るが、継続TCP転送の評価には使用しない。
 - 原因は未確認のダウンロード先を検証用に指定したこと。次回は提供元の公式テストファイルを採用し、HTTP応答、転送バイト、経路を確認してからECM/NSSカウンタを比較する。
+
+## 2026-10-31 NSS IPv4 TCP試験結果（未解決）
+
+- LAN側UbuntuからWG2600HP経由の宛先アドレス経路を確認した上で、Hetzner HTTPS Rangeを実行。HTTP 206、8,388,608 bytesのTCPダウンロードは成功（前回のCloudflare HTTP 403は不成立として除外）。
+- 実機NSS IPv4統計の報告値：`ipv4_rx_pkts=0`、`ipv4_tx_pkts=0`（common/special）、`ipv4_create_requests=0`、`ipv4_hash_hits=0`。先行測定ではECM IPv4 `accelerated_count=0`、TCP/UDP加速数も0。
+- **判定：NSS IPv4オフロード未実証。原因は未確定。** ルール作成要求が0のため、ECMフロントエンド停止、ECMのフロー認識、設定、DSA→NSSインターフェースマッピング、フロー適格性を優先調査。カウンタの標本時刻とTCP転送中の同時測定は完全には示されていないため、NSS故障とは断定しない。
+- ソース照合：`qca-nss-ecm.init` は `/sys/kernel/debug/ecm/front_end_ipv4_stop`、`ecm.global.acceleration_engine` を使用、`ecm_db` の接続数は `/sys/kernel/debug/ecm/ecm_db/connection_count` から確認できる。ECM起動状態と接続DBを先に検証し、原因不明の再ビルドを行わない。
