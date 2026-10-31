@@ -13,7 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate audit code
-        run: python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py tests/test_wg2600hp_cross_audit.py
+        run: |
+          sh -n target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit
+          test "$(git ls-files --stage target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit | awk '{print $1}')" = 100755
+          python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py tests/test_wg2600hp_cross_audit.py
       - name: Audit WG2600HP GMAC-DSA-WAN/LAN-NSS chain
         run: python3 scripts/wg2600hp_cross_audit.py
       - name: Verify regressions are rejected
