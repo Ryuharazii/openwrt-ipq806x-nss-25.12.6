@@ -168,3 +168,23 @@
 4. 電源投入→Boot ROM→U-Boot 全ログ照合、修正版RAM起動、IPv4/NSSオフロード、固定IPIP6実加速はいずれも未確認。
 
 **G1: 未確認、G2: 未確認、G3: FAIL（ビルド禁止）、G4: 未確認、G5: 既存RAM版IPv4 PASSのみ、G6: 既存RAM版NSS IPv4 FAIL／固定IPIP6未確認。** この作業ではファームビルド、GitHub Actions起動、sysupgrade、実機書き込みは実施していない。静的チェックの成功を完成宣言へ昇格させない。
+
+## 2026-10-31 Linux 6.12.112 ソースに対する QCA8K 43ハンク実文脈リプレイ
+
+対象: **WG2600HP/IPQ8064専用の隔離ブランチ** `wg2600hp-qca8021q-backport-isolated-20261031`、基準 HEAD `7d32c0329710bc4aaade9c6dae7fe31d79e3a6bb`。旧25.12.5成功パッチ原本はユーザー側で削除済みであり、入手不能として扱う。旧成果物の再提出は前提条件にしない。
+
+**検証手法**: 公開 `gregkh/linux` タグ **v6.12.112** の該当ソース7ファイルをGitHub経由で取得。実在するunified diffを解釈してold/contextを正確に照合し、新内容をメモリ上に順次適用。OpenWrt既存 `711-01` / `711-02` / `711-03` / `712` の後に、隔離 `760-01` / `760-02` / `760-03` の順で試験（`760-01`は既にpending-6.12、残りはstaging）。前後80行以内の位置ずれを許容し、**内容一致**しない箇所はFAIL。確認したハンクのみカウントし、コンパイラ・OpenWrt最終kernelツリーは使っていない。
+
+| 範囲 | 期待/一致 | 判定 |
+| --- | ---: | --- |
+| OpenWrt既存 711-01/02/03/712 | 9/9 | PASS（文脈一致のみ） |
+| 760-01 新QCA8021Q tagger | 5/5 | PASS（文脈一致のみ） |
+| 760-02 QCA8K switch / FDB / VLAN / rollback | 28/28 | PASS（文脈一致のみ） |
+| 760-03 2CPU VLAN membership | 1/1 | PASS（文脈一致のみ） |
+| **総計** | **43/43** | **PASS（文脈一致のみ）** |
+
+**起動時の有効化に関する新規未解決**: 現行 `target/linux/ipq806x/config-6.12` は `CONFIG_NET_DSA_TAG_QCA=y`、`CONFIG_NET_DSA_TAG_QCA_8021Q` 有効設定なし。 `qca8k_get_tag_protocol` は従来QCAが既定であり、追加候補は `change_tag_protocol` を提供するが、自動切替を保証しない。標準DSAは conduit の `/sys/class/net/<conduit>/dsa/tagging` 経由で、conduitとDSA user portsをdownにしてから切替可能。**起動処理の順序・CPU0/CPU6両conduit・LAN/WAN・失敗時復旧の整合を設計、実装、検証すること。** 対象実機へ切替コマンドはまだ実行していない。
+
+**他の未解決**: 760-04/05 ECMのOpenWrt 400/401適用後のソース互換・ARMビルド、taggerの実コンパイル、GMAC/DMA/MTU 1502(-22)/port(-34)、双方向bridge/FDB、ECM CREATE/ACK、固定IPIP6、8021Q→QCA reverse-error復旧、実機RAM試験。
+
+**ゲート**: G1 未確認（追加横断確認必要）、G2 未確認（回帰証拠不足）、**G3 FAIL／新規ファームビルド禁止**、G4 未確認、G5 旧RAM版のみIPv4 PASS、G6 旧RAM版NSS IPv4 FAIL・固定IPIP6未確認。**43/43の文字列リプレイをpatch --dry-run PASSやARMビルドPASSと呼ばない。** GitHub Actions起動、ビルド、フラッシュは今回実施していない。
