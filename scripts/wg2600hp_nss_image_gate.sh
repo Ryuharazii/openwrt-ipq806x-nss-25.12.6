@@ -21,16 +21,26 @@ for opt in \
   CONFIG_NSS_DRV_IPV6_ENABLE \
   CONFIG_NSS_DRV_VIRT_IF_ENABLE \
   CONFIG_TARGET_ROOTFS_INITRAMFS \
-  CONFIG_NSS_DRV_TUNIPIP6_ENABLE; do
+  CONFIG_NSS_DRV_TUNIPIP6_ENABLE \
+  CONFIG_NSS_DRV_WIFI_ENABLE \
+  CONFIG_PACKAGE_MAC80211_NSS_SUPPORT \
+  CONFIG_PACKAGE_kmod-ath10k-ct \
+  CONFIG_PACKAGE_kmod-mac80211 \
+  CONFIG_PACKAGE_ath10k-firmware-qca99x0-ct; do
     if ! option "$opt"; then echo "FAIL config: $opt"; fail=1; fi
 done
-manifest=$(find "$outdir" -maxdepth 1 -type f -name '*ipq806x-generic*.manifest' -print -quit)
+manifest=$(find "$outdir" -maxdepth 1 -type f -name '*-nec_wg2600hp.manifest' -print -quit)
 [ -n "$manifest" ] || { echo 'FAIL WG2600HP manifest is absent'; exit 1; }
 for pkg in \
   kmod-qca-nss-gmac \
   kmod-qca-nss-drv \
   kmod-qca-nss-ecm-standard \
-  kmod-qca-nss-drv-tunipip6; do
+  kmod-qca-nss-drv-tunipip6 \
+  kmod-ath10k-ct \
+  kmod-mac80211 \
+  ath10k-firmware-qca99x0-ct \
+  ath10k-board-qca99x0 \
+  wpad-basic-mbedtls; do
     if ! has_package "$pkg"; then echo "FAIL manifest: $pkg"; fail=1; fi
 done
 image=$(find "$outdir" -maxdepth 1 -type f -name '*nec_wg2600hp-*sysupgrade.bin' -print -quit)
