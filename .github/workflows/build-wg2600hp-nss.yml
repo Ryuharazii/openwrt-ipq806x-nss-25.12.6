@@ -1,9 +1,7 @@
 name: Build WG2600HP NSS 25.12.6
 
+# Manual builds only: avoid unnecessary 6-hour GitHub runner jobs on each commit.
 on:
-  push:
-    branches:
-      - 'wg2600hp-nss-*'
   workflow_dispatch:
 
 concurrency:
