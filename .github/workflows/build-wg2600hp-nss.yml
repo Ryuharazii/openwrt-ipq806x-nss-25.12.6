@@ -85,6 +85,7 @@ jobs:
           python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py
           python3 scripts/wg2600hp_cross_audit.py
           python3 -m unittest discover -s tests -p 'test_wg2600hp_cross_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_wg2600hp_wifi_nss_binary.py' -v
 
       - name: Download source archives
         run: make -j8 download
