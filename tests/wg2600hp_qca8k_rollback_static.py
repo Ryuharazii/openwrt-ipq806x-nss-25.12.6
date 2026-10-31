@@ -69,8 +69,10 @@ check("partial VLAN enable failure unwinds VLAN before restoring headers",
       "ret = qca8k_set_tag_8021q_vlan_mode(priv, true);\n+\t\tif (ret)\n+\t\t\tgoto restore_vlan;" in tag)
 check("both rollback failures logged",
       "QCA VLAN rollback failed" in tag and "QCA header rollback failed" in tag)
-check("restored only after successful header recovery under locks",
-      "if (!rollback_ret)\n+\t\tpriv->mgmt_conduit = saved_mgmt_conduit;" in tag and
+check("restored only after both VLAN and header rollback succeed under locks",
+      "bool vlan_rollback_ok = true;" in switch and
+      "vlan_rollback_ok = false;" in tag and
+      "if (!rollback_ret && vlan_rollback_ok)\n+\t\tpriv->mgmt_conduit = saved_mgmt_conduit;" in tag and
       "mutex_lock(&priv->mgmt_eth_data.mutex)" in tag and
       "mutex_lock(&priv->mib_eth_data.mutex)" in tag)
 check("QCA8337 CPU0/6 mappings",
