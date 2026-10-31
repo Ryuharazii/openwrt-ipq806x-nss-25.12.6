@@ -1,0 +1,31 @@
+# WG2600HP (IPQ8064) OpenWrt 25.12.6 NSS — Resume here
+
+**作業再開の唯一の入口 (2026-10-31)**。セッション移動時は最初にこの文書と [WG2600HP-EXECUTION-GATES.md](WG2600HP-EXECUTION-GATES.md) を読むこと。**以前の経緯を再説明してもらったり同一ZIPを再アップロードしてもらったりしないこと。** ユーザーが過去パッチを復元している場合も、復元完了を待って作業を一方的に中断しない。再入手できた場合は差分証拠として取り込む。
+
+## 固定条件
+
+- 対象は **NEC WG2600HP (IPQ8064)** のみ。WG2600HP3 (IPQ8062) を混同しない。
+- OpenWrt **25.12.6**, kernel **6.12.112**, NSS IPv4 LAN→WAN通信・加速成立が当面の優先順位。固定IPIP6のNSS加速が最終目標。
+- 作業ブランチ `wg2600hp-qca8021q-backport-isolated-20261031`。通常作業ブランチ `wg2600hp-nss-gmac-no-phy-20261031` へ未検証の候補をマージしない。default branchは古い参照版。
+- 5条件を厳守: 開始時既存記録確認／修正前ブート～通信横断照合／修正後後続影響・回帰／ビルド前に根拠記録・問題があればビルド禁止／ビルド後実機RAM起動・IPv4とNSS加速実証。
+- **正常動作の誤認禁止**: 以前のRAM版ではLAN→WAN IPv4通信PASS、NSS IPv4加速FAIL（ECM `FAIL_RULE=-2`, `lan1/br-lan/wan` NSS AE=-1、`ipv4_create_requests=0`）。固定IPIP6は未確認。
+- **2026-10-26成功版原本 `0031.patch` / `9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` は現在ない**。元パッチの回収を開発継続の前提としない。復元されたら追加比較する。
+- **2026-10-31実際に読み取ったZIP**: `WG2600HP-IPQ8064-25.12.6-NSS(20261031-132923).zip`, SHA256 `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。内容は既存25.12.6 initramfs uImage、squashfs sysupgrade、SHA256SUMS、manifest、resolved.config の5エントリ。**修正版の新規ビルドではない。再提出不要。** GitHubにはハッシュ記録のみでバイナリは保存していない。
+
+## 現在保存されている候補と検証
+
+- `target/linux/generic/pending-6.12/760-01-net-dsa-qca8k-8021q-tagger-stage.patch`: staged kernel tagger。
+- `backports/staging/760-02-net-dsa-qca8k-8021q-driver-6.12-CANDIDATE.patch`: QCA8K switch / management rollback 修正版、**stagingのみ**。リバースタグ切替の途中失敗復旧が不十分。
+- `backports/staging/760-03-net-dsa-8021q-dual-cpu-vlan-isolation-6.12.patch`: CPU0/CPU6のVLAN分離、stagingのみ。
+- `backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch` / `760-05-ecm-nss-vlan-dsa-guards-pinned-CANDIDATE.patch`: pinned ECM `9acdcb05` 用、stagingのみ・OpenWrt固有400/401パッチ後未統合。
+- 公開 Linux `gregkh/linux v6.12.112` 該当7ソースへ、既存711/712 + 新760-01/02/03を順次 **unified-diff文脈リプレイ 43/43件一致**。これはパッチ適用文脈の一致のみで**コンパイル・起動・回帰の証明ではない**。
+- `tests/wg2600hp_qca8k_rollback_static.py`: 文字列・パッチハンクの静的チェックを追加済み。GitHub追加後の**実Python実行は未確認**。
+
+## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
+
+1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
+2. 新DSA taggerを有効化する構成と**起動時QCA→8021Q切替**のdown/up順序、両conduit、WAN DHCP、LANブリッジ、タグ変更失敗時の回復経路を確定。危険な未検証切替を稼働機に適用しない。
+3. `760-04/05` を pinned ECM + 既存OpenWrtパッチ適用順に照合。ECMが`lan1`と`wan`から正しいNSS GMAC IFへ階層を構築すること、QCA8337のLAN/WAN間VLAN分離が維持されることを検証。
+4. 残った問題を根拠付きで台帳へ記録。未解決の間 **G3 FAIL、新規ビルド不可**。解決後に隔離ビルドとRAM起動でIPv4/NSSを測定。
+
+**作業方針**: あらゆる作業停止をユーザーの指示なしに宣言しない。復元作業は並行タスク。差分や記録はGitHubへ保存して検証可能にする。結果のない「進めます」だけで終えない。
