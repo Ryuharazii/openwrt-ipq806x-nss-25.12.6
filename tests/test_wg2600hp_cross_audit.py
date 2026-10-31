@@ -11,6 +11,7 @@ REPO = Path(__file__).resolve().parent.parent
 FILES = (
     "scripts/wg2600hp_cross_audit.py",
     "scripts/wg2600hp_verify_embedded_dtb.py",
+    "scripts/wg2600hp_verify_wifi_nss_binary.py",
     "scripts/wg2600hp_nss_image_gate.sh",
     "target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts",
     "target/linux/ipq806x/base-files/etc/board.d/02_network",
@@ -153,6 +154,19 @@ class CrossAuditTest(unittest.TestCase):
         result = self.run_audit()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("FAIL WG2600HP build selects NSS Wi-Fi redirect", result.stdout)
+
+    def test_detects_wifi_elf_verifier_disabled(self):
+        self.mutate(
+            "scripts/wg2600hp_nss_image_gate.sh",
+            "python3 scripts/wg2600hp_verify_wifi_nss_binary.py",
+            "# disabled Wi-Fi NSS ELF verification",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Image gate checks compiled Wi-Fi NSS ELF",
+            result.stdout,
+        )
 
     def test_detects_missing_wifi_package_image_gate(self):
         self.mutate(
