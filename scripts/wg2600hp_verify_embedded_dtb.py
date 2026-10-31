@@ -107,6 +107,24 @@ def check(path):
             nodes.get(path, {}).get('label') == (label.encode('ascii') + b'\0')
         )
 
+    # Both DSA CPU conduits use fixed links.  PHY_MAX_ADDR (32) tells
+    # qca-nss-gmac not to attach a non-existent MDIO PHY.
+    gmacs = {}
+    for name, props in nodes.items():
+        if b'qcom,nss-gmac' not in props.get('compatible', b'').split(b'\\0'):
+            continue
+        raw_id = props.get('qcom,id', b'')
+        if len(raw_id) == 4:
+            gmacs[struct.unpack('>I', raw_id)[0]] = (name, props)
+    for mac_id in (1, 2):
+        entry = gmacs.get(mac_id)
+        checks['NSS GMAC%d fixed-link, no external PHY' % mac_id] = (
+            entry is not None
+            and entry[1].get('qcom,phy-mdio-addr') == struct.pack('>I', 32)
+            and entry[1].get('qcom,poll-required') == struct.pack('>I', 0)
+            and any(name.startswith(entry[0] + '/fixed-link') for name in nodes)
+        )
+
     for name, ok in checks.items():
         print('%s %s' % ('PASS' if ok else 'FAIL', name))
     if not all(checks.values()):
