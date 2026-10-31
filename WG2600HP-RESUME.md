@@ -6,6 +6,8 @@
 
 - 対象は **NEC WG2600HP (IPQ8064)** のみ。WG2600HP3 (IPQ8062) を混同しない。
 - OpenWrt **25.12.6**, kernel **6.12.112**, NSS IPv4 LAN→WAN通信・加速成立が当面の優先順位。固定IPIP6のNSS加速が最終目標。
+- **ユーザー明示（2026-10-31）:「VLANは必要ない」**。WAN/LANでISPタグ・802.1Qサブインターフェース等の**ユーザー向けVLAN設定は不要**。新規VLAN設定を前提にしない。既存の `target/linux/ipq806x/base-files/etc/board.d/02_network` もWG2600HPに `lan1 lan2 lan3 lan4`/ `wan` を設定し、conduitはLAN→`eth1`、WAN→`eth0`。新たなユーザーVLAN設定は明示されていない。
+- **内部フレーム識別とユーザー用VLANを区別すること**。QCA8337/DSAにはポート識別が必要であり、候補の `qca-8021q` はユーザーがVLANを設定することとは別の**内部タグ方式**。標準QCAヘッダのままNSS L3処理を成立させられるかも独立して検証し、8021Qの導入を無条件の前提にしない。公開IPQ5018+QCA8337事例はNSSがQCA 2バイトヘッダを解析できないと報告（https://github.com/kuncy7/openwrt-nss-edma/blob/c3po-tag-8021q/README.ipq50xx.md）しているが、**WG2600HP/IPQ8064での再現は未確認**。
 - 作業ブランチ `wg2600hp-qca8021q-backport-isolated-20261031`。通常作業ブランチ `wg2600hp-nss-gmac-no-phy-20261031` へ未検証の候補をマージしない。default branchは古い参照版。
 - 5条件を厳守: 開始時既存記録確認／修正前ブート～通信横断照合／修正後後続影響・回帰／ビルド前に根拠記録・問題があればビルド禁止／ビルド後実機RAM起動・IPv4とNSS加速実証。
 - **正常動作の誤認禁止**: 以前のRAM版ではLAN→WAN IPv4通信PASS、NSS IPv4加速FAIL（ECM `FAIL_RULE=-2`, `lan1/br-lan/wan` NSS AE=-1、`ipv4_create_requests=0`）。固定IPIP6は未確認。
@@ -24,8 +26,8 @@
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
-2. 新DSA taggerを有効化する構成と**起動時QCA→8021Q切替**のdown/up順序、両conduit、WAN DHCP、LANブリッジ、タグ変更失敗時の回復経路を確定。危険な未検証切替を稼働機に適用しない。
-3. `760-04/05` を pinned ECM + 既存OpenWrtパッチ適用順に照合。ECMが`lan1`と`wan`から正しいNSS GMAC IFへ階層を構築すること、QCA8337のLAN/WAN間VLAN分離が維持されることを検証。
+2. **追加のユーザー用VLANなし**で、既存のQCAタグ維持案と、NSSが解析可能と報告される内部8021Qタグ案を比較する。前者はNSSパケット解析とポート識別を証明すること。後者は起動時タグ変更のdown/up順序、CPU0/6両conduit、WAN DHCP、LANブリッジ、変更失敗時の回復を検証すること。未検証のタグ切替を稼働機に適用しない。
+3. `760-04/05` を pinned ECM + 既存OpenWrtパッチ適用順に照合。ECMが`lan1`と`wan`から正しいNSS GMAC IFへ階層を構築すること、QCA8337の**LAN/WAN間のパケット分離**が保たれることを検証。ユーザー用VLAN設定は要求しない。
 4. 残った問題を根拠付きで台帳へ記録。未解決の間 **G3 FAIL、新規ビルド不可**。解決後に隔離ビルドとRAM起動でIPv4/NSSを測定。
 
 **作業方針**: あらゆる作業停止をユーザーの指示なしに宣言しない。復元作業は並行タスク。差分や記録はGitHubへ保存して検証可能にする。結果のない「進めます」だけで終えない。
