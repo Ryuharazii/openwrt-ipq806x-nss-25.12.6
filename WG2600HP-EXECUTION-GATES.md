@@ -205,3 +205,11 @@
 - **再発防止**: commit `b866f7e4d42d1b063fdf754d121d4be8f935c676`、`tests/wg2600hp_qca8k_rollback_static.py` で両条件を静的チェック。GitHub再取得の6ファイルに対するJS静的照合を実行し **13/13 項目PASS**（QCA8K 28/28 unified-diffハンク個数・行数・offset確認を含む）。**Pythonスクリプトは未実行**。patch実適用、ARMコンパイル、実機回帰は未実施。成功報告は静的照合に限定。
 - **影響範囲/未解決**: 正常復帰では両成功条件ともtrueで従来通りCPU0 Ethernet管理を復旧。片方でも失敗すれば管理conduitを復旧しない（別経路MDIOは必要）。8021Q→QCA逆方向切替途中の失敗、部分的PVID更新、FW/GMAC/MTU、ECM階層/IF解決、LAN/WANの実パケット分離は未検証。
 - **必須ゲート**: G1の全起動シーケンス未完、G2の実ソース・回帰未完、**G3 FAILでビルド禁止維持**。既存RAMイメージのIPv4転送成功・NSS高速化失敗という状態は変わらず。ユーザー向けVLAN追加はなし。
+
+## 2026-10-31 DSA tag_8021q登録失敗時の残存ポインタ修正（隔離）
+
+- **確認した実コード**: Linux **v6.12.112** の `net/dsa/tag_8021q.c`、`dsa_tag_8021q_register()` は `ds->tag_8021q_ctx = ctx` のあと `dsa_tag_8021q_setup()` を呼ぶが、失敗時 `err_free: kfree(ctx)` のみで `ds->tag_8021q_ctx` をNULLへ戻さず、以前の成功ポートのVLANとフィルタを片付けない。切替候補 `760-02` の登録失敗→復旧経路で参照切れが生じる。
+- **対処**: 隔離ブランチ `backports/staging/760-06-net-dsa-8021q-register-error-cleanup-6.12-CANDIDATE.patch` を追加。commit `95d275b6ce490d3641aadfdd75082bee04980a1d`。失敗時の `kfree(ctx)` を既存の `dsa_tag_8021q_unregister(ds)` に変更し、setup途中のユーザーポートの削除、コンテキスト解放・NULL化に集約する。関数プロトタイプは `include/linux/dsa/8021q.h` に既存。
+- **検証**: v6.12.112元ソースへ既存760-03のunified-diff文脈を**JSで完全一致照合してメモリ上で再構築**、その結果に対し新760-06のunified-diffも**文脈一致**（`@@ -443,9 +443,12 @@`）。GitHubへコミット後読み戻して、既存760-02の28/28ハンクを含む**16/16のJS静的文字列・ハンク構造チェックPASS**。テスト追記: commit `914e7383924ff34c250c40978301185620d6ec66`。
+- **未検証を明示**: kernelの実パッチ適用（`patch --dry-run`を含む）・Python回帰テスト実行・ARMコンパイル・失敗注入・実機RAM起動・ネットワーク回帰は **未実施**。unregister処理自体のHW書き込み失敗は依然として残りうる。8021Q→QCA逆方向切替失敗、ECMのOpenWrt 400/401との統合、起動時タグ選択、Wi-Fi NSS redirectと固定IPIP6は未解決。
+- **ゲート**: G3 **FAIL**（未統合候補のみ、ビルド禁止維持）。稼働版と通常作業ブランチは変更なし。追加のユーザー用VLAN設定なし。
