@@ -66,7 +66,7 @@ check("save management before clearing and changing header",
 check("header-disable failure unwinds",
       "if (ret)\n+\t\t\tgoto restore_hdr;" in tag[tag.find("qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_NONE)"):])
 check("partial VLAN enable failure unwinds VLAN before restoring headers",
-      "ret = qca8k_set_tag_8021q_vlan_mode(priv, true);\\n+\\t\\tif (ret)\\n+\\t\\t\\tgoto restore_vlan;" in tag)
+      "ret = qca8k_set_tag_8021q_vlan_mode(priv, true);\n+\t\tif (ret)\n+\t\t\tgoto restore_vlan;" in tag)
 check("both rollback failures logged",
       "QCA VLAN rollback failed" in tag and "QCA header rollback failed" in tag)
 check("restored only after successful header recovery under locks",
