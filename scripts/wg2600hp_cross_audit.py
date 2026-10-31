@@ -158,6 +158,23 @@ def main():
           and "skb_push(skb, ETH_HLEN)" in rx_redirect
           and 0 <= tx_call < fallback_pull < stack_fallback
           and "+\t\tskb_pull(skb, ETH_HLEN);" in rx_redirect)
+    # The NSS TX QoS helper runs before the 802.3 xmit length check.
+    # Check that the helper bounds all header reads to the linear skb.
+    tx_helper_start = wifi_redirect.find("+static void ieee80211_xmit_nss_fixup(")
+    tx_helper_end = wifi_redirect.find(" /**", tx_helper_start)
+    tx_helper = wifi_redirect[tx_helper_start:tx_helper_end] if (
+        tx_helper_start >= 0 and tx_helper_end >= 0) else ""
+    eth_guard = tx_helper.find("skb_headlen(skb) >= ETH_HLEN")
+    eth_access = tx_helper.find("((struct ethhdr *)skb->data)->h_proto")
+    ipv4_guard = tx_helper.find("ETH_HLEN + sizeof(struct iphdr)")
+    ipv4_access = tx_helper.find("ipv4_get_dsfield(ip_hdr(skb))")
+    ipv6_guard = tx_helper.find("ETH_HLEN + sizeof(struct ipv6hdr)")
+    ipv6_access = tx_helper.find("ipv6_get_dsfield(ipv6_hdr(skb))")
+    check("Wi-Fi NSS TX QoS checks linear header lengths before reads",
+          -1 < eth_guard < eth_access
+          and -1 < ipv4_guard < ipv4_access
+          and -1 < ipv6_guard < ipv6_access
+          and tx_helper.count("if (unlikely(skb_headlen(skb) <") == 2)
     for idx in (0, 1):
         radio = node(dts, r"&pcie_bridge" + str(idx))
         check("WG2600HP PCIe Wi-Fi radio %d has NVMEM calibration" % idx,
