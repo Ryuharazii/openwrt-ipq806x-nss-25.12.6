@@ -147,8 +147,8 @@ def main():
     check("Firmware gate inspects embedded *built* DTB",
           "wg2600hp_verify_embedded_dtb.py" in image_gate)
     check("Built DTB gate checks DSA CPU modes and conduits",
-          "DSA CPU port 0 mode and conduit" in image_verifier
-          and "DSA CPU port 6 mode and conduit" in image_verifier)
+          "checks['DSA CPU port %d mode and conduit' % port]" in image_verifier
+          and "((0, 1, b'rgmii\\0'), (6, 2, b'sgmii\\0'))" in image_verifier)
 
     failed = [label for label, ok in CHECKS if not ok]
     print("\nSTATIC CROSS-AUDIT %s (%d/%d)" %
