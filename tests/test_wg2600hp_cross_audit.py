@@ -144,6 +144,32 @@ class CrossAuditTest(unittest.TestCase):
             result.stdout,
         )
 
+    def test_detects_missing_wifi_package_image_gate(self):
+        self.mutate(
+            "scripts/wg2600hp_nss_image_gate.sh",
+            "ath10k-board-qca99x0",
+            "missing-ath10k-board",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Image gate enforces WG2600HP wireless packages",
+            result.stdout,
+        )
+
+    def test_detects_non_specific_image_manifest_glob(self):
+        self.mutate(
+            "scripts/wg2600hp_nss_image_gate.sh",
+            "'*-nec_wg2600hp.manifest'",
+            "'*ipq806x-generic*.manifest'",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Image gate selects WG2600HP-specific package manifest",
+            result.stdout,
+        )
+
     def test_detects_wrong_dsa_cpu_port_mode(self):
         self.mutate(
             "target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts",
