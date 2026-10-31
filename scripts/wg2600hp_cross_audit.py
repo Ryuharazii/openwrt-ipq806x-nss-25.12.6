@@ -145,6 +145,19 @@ def main():
           "CPTCFG_MAC80211_NSS_SUPPORT" in wifi_redirect
           and "nss_virt_if_create_sync" in wifi_redirect
           and "nss_virt_if_tx_buf" in wifi_redirect)
+    rx_redirect_start = wifi_redirect.find("+static void netif_rx_nss(")
+    rx_redirect_end = wifi_redirect.find(" static void ieee80211_deliver_skb_to_local_stack",
+                                         rx_redirect_start)
+    rx_redirect = wifi_redirect[rx_redirect_start:rx_redirect_end] if (
+        rx_redirect_start >= 0 and rx_redirect_end >= 0) else ""
+    tx_call = rx_redirect.find("nss_virt_if_tx_buf(sdata->nssctx, skb)")
+    fallback_pull = rx_redirect.find("skb_pull(skb, ETH_HLEN)")
+    stack_fallback = rx_redirect.find("netif_receive_skb(skb)")
+    check("Wi-Fi NSS redirect preserves skb offset after TX rejection",
+          "skb_headroom(skb) < ETH_HLEN" in rx_redirect
+          and "skb_push(skb, ETH_HLEN)" in rx_redirect
+          and 0 <= tx_call < fallback_pull < stack_fallback
+          and "+\t\tskb_pull(skb, ETH_HLEN);" in rx_redirect)
     for idx in (0, 1):
         radio = node(dts, r"&pcie_bridge" + str(idx))
         check("WG2600HP PCIe Wi-Fi radio %d has NVMEM calibration" % idx,
