@@ -115,10 +115,20 @@ def main(path):
             raise ValueError('missing or empty initramfs file: ' + file)
         print('PASS bundled ' + file)
     with TemporaryDirectory(prefix='wg2600hp-wifi-nss-') as tmp:
-        mac = Path(tmp) / 'mac80211.ko'
-        nss = Path(tmp) / 'qca-nss-drv.ko'
-        mac.write_bytes(files[MODULES[0]])
-        nss.write_bytes(files[MODULES[1]])
+        module_paths = {}
+        for name in MODULES:
+            path = Path(tmp) / Path(name).name
+            path.write_bytes(files[name])
+            elf_header = readelf(path, '-h')
+            module_info = readelf(path, '-p', '.modinfo')
+            if not (re.search(r'Class:\s+ELF32\b', elf_header) and
+                    re.search(r'Machine:\s+ARM\b', elf_header) and
+                    re.search(r'vermagic=6\.12\.112\s', module_info)):
+                raise ValueError('module has wrong ARM ELF/kernel ABI: ' + name)
+            module_paths[name] = path
+            print('PASS ARM ELF32 kernel 6.12.112: ' + Path(name).name)
+        mac = module_paths[MODULES[0]]
+        nss = module_paths[MODULES[1]]
         macsyms = readelf(mac, '-Ws')
         exports = readelf(nss, '-p', '__ksymtab_strings')
         modinfo = readelf(mac, '-p', '.modinfo')
