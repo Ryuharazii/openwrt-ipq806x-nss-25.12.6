@@ -101,3 +101,9 @@
 - OpenWrt実機の報告では `front_end_ipv4_stop=0`、`ecm_db/connection_count=2`（前の試験報告値1から増加）。
 - この2件が当該TCPダウンロードの通信に対応するか、ECM/NSSのどの加速状態にあるかは**未確認**。過去に報告されたNSS IPv4統計は0のままだが、今回の転送と同時測定した新しい統計値はまだ取得していない。
 - 次は `ecm_dump.sh ecm_db` の接続状態と `front_end_selection` を読んで原因を絞る。NSS/DSAやECMのコード変更は保留。
+
+## 2026-10-31 ECM状態ダンプの呼び出し誤りと修正
+
+- 実機で `ecm_dump.sh ecm_db` は `exit_code=2`、出力0バイト。`/sys/kernel/debug/ecm/ecm_db/state_dev_major` は存在せず、`/sys/kernel/debug/ecm/ecm_state/state_dev_major` が存在。
+- リポジトリの `package/qca-nss/qca-nss-ecm/files/ecm_dump.sh` は **引数なし時に `ecm_state`** を既定使用し、指定モジュールの `state_dev_major` がないと `exit 2` となる。したがってこの試験失敗はECM状態ダンプの不正な引数指定に起因し、NSS/ECMの故障の根拠ではない。
+- 次回は実機 `ecm_dump.sh`（引数なし）で `/tmp/ecm-state.txt` を取得し、加速状態を確認する。不要な再ダウンロード・ビルドは行わない。
