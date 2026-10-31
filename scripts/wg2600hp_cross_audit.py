@@ -136,7 +136,9 @@ def main():
     wifi_config = config.splitlines()
     check("WG2600HP build selects NSS Wi-Fi redirect",
           "CONFIG_NSS_DRV_WIFI_ENABLE=y" in wifi_config
-          and "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y" in wifi_config)
+          and "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y" in wifi_config
+          and "CONFIG_PACKAGE_kmod-ath10k-ct=y" in wifi_config
+          and "CONFIG_PACKAGE_kmod-mac80211=y" in wifi_config)
     mac80211_deps = mac80211.split("PKG_CONFIG_DEPENDS:= ", 1)
     mac80211_deps = mac80211_deps[1].split("\n\n", 1)[0] if len(mac80211_deps) == 2 else ""
     check("mac80211 NSS option changes package configuration stamp",
