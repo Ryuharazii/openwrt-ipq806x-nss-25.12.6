@@ -118,6 +118,32 @@ class CrossAuditTest(unittest.TestCase):
             result.stdout,
         )
 
+    def test_detects_wifi_nss_tx_short_ethernet_bounds(self):
+        self.mutate(
+            "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
+            "skb_headlen(skb) >= ETH_HLEN",
+            "skb_headlen(skb) >= 0",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Wi-Fi NSS TX QoS checks linear header lengths before reads",
+            result.stdout,
+        )
+
+    def test_detects_wifi_nss_tx_short_ipv6_bounds(self):
+        self.mutate(
+            "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
+            "ETH_HLEN + sizeof(struct ipv6hdr)",
+            "ETH_HLEN + 0",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Wi-Fi NSS TX QoS checks linear header lengths before reads",
+            result.stdout,
+        )
+
     def test_detects_wrong_dsa_cpu_port_mode(self):
         self.mutate(
             "target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts",
