@@ -111,7 +111,7 @@ Do not enable new tag protocol on real hardware.
  	case DSA_TAG_PROTO_QCA:
  		tagger_data = ds->tagger_data;
  
-@@ -1911,6 +1919,162 @@
+@@ -1911,6 +1919,187 @@
  	return 0;
  }
  
@@ -195,6 +195,8 @@ Do not enable new tag protocol on real hardware.
 +{
 +	struct qca8k_priv *priv = ds->priv;
 +	struct dsa_port *dp;
++	struct net_device *saved_mgmt_conduit = NULL;
++	int rollback_ret;
 +	int ret;
 +
 +	if (proto == priv->tag_proto)
@@ -234,20 +236,32 @@ Do not enable new tag protocol on real hardware.
 +				return ret;
 +		}
 +
-+		return qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_ALL);
++		ret = qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_ALL);
++		if (ret)
++			return ret;
++		/* CPU0's Ethernet management becomes usable again in QCA mode. */
++		dsa_switch_for_each_cpu_port(dp, ds) {
++			if (dp->index == 0 && dp->conduit) {
++				qca8k_conduit_change(ds, dp->conduit,
++						    netif_oper_up(dp->conduit));
++				break;
++			}
++		}
++		return 0;
 +	case DSA_TAG_PROTO_QCA_8021Q:
 +		/* Management frames need the Atheros header; from here on
 +		 * every register access goes over MDIO.
 +		 */
 +		mutex_lock(&priv->mgmt_eth_data.mutex);
 +		mutex_lock(&priv->mib_eth_data.mutex);
++		saved_mgmt_conduit = priv->mgmt_conduit;
 +		priv->mgmt_conduit = NULL;
 +		mutex_unlock(&priv->mib_eth_data.mutex);
 +		mutex_unlock(&priv->mgmt_eth_data.mutex);
 +
 +		ret = qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_NONE);
 +		if (ret)
-+			return ret;
++			goto restore_hdr;
 +
 +		ret = qca8k_set_tag_8021q_vlan_mode(priv, true);
 +		if (ret)
@@ -265,9 +279,20 @@ Do not enable new tag protocol on real hardware.
 +
 +restore_vlan:
 +	priv->tag_proto = DSA_TAG_PROTO_QCA;
-+	qca8k_set_tag_8021q_vlan_mode(priv, false);
++	rollback_ret = qca8k_set_tag_8021q_vlan_mode(priv, false);
++	if (rollback_ret)
++		dev_err(ds->dev, "QCA VLAN rollback failed: %d\n", rollback_ret);
 +restore_hdr:
-+	qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_ALL);
++	rollback_ret = qca8k_set_hdr_mode(priv, QCA8K_PORT_HDR_CTRL_ALL);
++	if (rollback_ret)
++		dev_err(ds->dev, "QCA header rollback failed: %d\n", rollback_ret);
++	mutex_lock(&priv->mgmt_eth_data.mutex);
++	mutex_lock(&priv->mib_eth_data.mutex);
++	/* Keep MDIO-only access if QCA header restoration failed. */
++	if (!rollback_ret)
++		priv->mgmt_conduit = saved_mgmt_conduit;
++	mutex_unlock(&priv->mib_eth_data.mutex);
++	mutex_unlock(&priv->mgmt_eth_data.mutex);
 +	return ret;
 +}
 +
