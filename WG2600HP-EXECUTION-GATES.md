@@ -79,3 +79,11 @@
 - 実機NSS IPv4統計の報告値：`ipv4_rx_pkts=0`、`ipv4_tx_pkts=0`（common/special）、`ipv4_create_requests=0`、`ipv4_hash_hits=0`。先行測定ではECM IPv4 `accelerated_count=0`、TCP/UDP加速数も0。
 - **判定：NSS IPv4オフロード未実証。原因は未確定。** ルール作成要求が0のため、ECMフロントエンド停止、ECMのフロー認識、設定、DSA→NSSインターフェースマッピング、フロー適格性を優先調査。カウンタの標本時刻とTCP転送中の同時測定は完全には示されていないため、NSS故障とは断定しない。
 - ソース照合：`qca-nss-ecm.init` は `/sys/kernel/debug/ecm/front_end_ipv4_stop`、`ecm.global.acceleration_engine` を使用、`ecm_db` の接続数は `/sys/kernel/debug/ecm/ecm_db/connection_count` から確認できる。ECM起動状態と接続DBを先に検証し、原因不明の再ビルドを行わない。
+
+## 2026-10-31 過去のNSS成功条件との横断比較（修正未適用）
+
+- **過去の実機成功記録（25.12.5）**：WG2600HP/IPQ8064で LAN2 から128MiBファイルを5回転送し、NSS IPv4 RX bytes 908425034→1465037652、TX bytes 923331068→1488930978、`ipv4_create_requests` 216→240、`ipv4_create_invalid_interface=0` を記録。別試験で `eth0` のNSS IF=1、`eth1`=2、DSA `wan/lan2/br-lan`=-1。過去ログでは `eth0`・`eth1` ともDSAタグ方式 `qca-8021q` と報告。
+- **現行25.12.6リポジトリで確認済み**：WG2600HP DTSはQCA8337のDSA CPUポート0 `gmac1/eth0` と6 `gmac2/eth1` を指定する一方、DTSに `qca-8021q` のタグ指定が見つからない。`target/linux/ipq806x/patches-6.12` の101パッチ名に過去の `999-009`～`999-011` 相当のQCA8K 8021Q/二CPUパッチは見当たらず、`990-0001/0002`にも `qca8k`/DSAタグ改変は見当たらない。
+- **要確認・有力な差分**：vanilla Linux 6.12 QCA8Kドライバは原則 `DSA_TAG_PROTO_QCA` を使用し、旧 `qca-8021q` とは異なる。実機が現在 `qca` タグで稼働しているかを要確認。NSSファームウェアのレイヤ3処理やインターフェース識別に影響する**可能性**があるが、今回の `ipv4_create_requests=0` の確定原因とはまだ断言しない。
+- **別の有力確認事項**：ECMパッケージの `qca-nss-ecm.init` は `front_end_ipv4_stop` と `ecm.global.acceleration_engine` を参照する。停止フラグ、ECM connection_count、GMAC phys_if/DSA tagを実機で確認する。U-Boot操作はLinux側で指示しない。
+- **措置**：現行RAM試験を継続、追加ビルド・書き込み・過去のパッチの無条件移植は行わない。旧正常版との相違を検証してから最小修正を選択。
