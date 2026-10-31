@@ -98,7 +98,7 @@ def main():
     for index, role in ((1, "wan"), (2, "lan1"), (3, "lan2"),
                         (4, "lan3"), (5, "lan4")):
         p = node(ports, r"port@" + str(index))
-        phy = node(node(sw, r"mdio"), r"phy_port" + str(index) + r":\s*phy@")
+        phy = node(node(sw, r"mdio"), r"phy_port" + str(index) + r":\s*phy@\d+")
         check("DSA port %d %s -> internal PHY %d" % (index, role, index - 1),
               scalar(p, "reg") == str(index)
               and 'label = "' + role + '";' in p
