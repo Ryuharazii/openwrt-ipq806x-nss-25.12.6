@@ -91,6 +91,22 @@ def check(path):
         'TUNIPIP6 device-tree enable': any('qcom,tunipip6-enabled' in v for v in nodes.values() if b'qcom,nss' in v.get('compatible', b'').split(b'\0')),
         'firmware partition size 0x17a0000': any(v.get('reg') == struct.pack('>II', 0x860000, 0x17a0000) for name, v in nodes.items() if name.endswith('/firmware@860000')),
     }
+    # The NSS image must retain the official 25.12.6 WG2600HP DSA topology.
+    switches = [
+        (name, props) for name, props in nodes.items()
+        if b'qca,qca8337' in props.get('compatible', b'').split(b'\0')
+    ]
+    checks['QCA8337 DSA switch x1'] = len(switches) == 1
+    expected_ports = {
+        0: 'cpu', 1: 'wan', 2: 'lan1', 3: 'lan2',
+        4: 'lan3', 5: 'lan4', 6: 'cpu',
+    }
+    for port, label in expected_ports.items():
+        path = (switches[0][0] + '/ports/port@%d' % port) if len(switches) == 1 else ''
+        checks['DSA port %d = %s' % (port, label)] = (
+            nodes.get(path, {}).get('label') == (label.encode('ascii') + b'\0')
+        )
+
     for name, ok in checks.items():
         print('%s %s' % ('PASS' if ok else 'FAIL', name))
     if not all(checks.values()):
