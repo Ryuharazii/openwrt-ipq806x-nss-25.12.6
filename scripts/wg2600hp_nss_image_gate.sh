@@ -51,27 +51,10 @@ fi
 initramfs=$(find "$outdir" -maxdepth 1 -type f -name '*nec_wg2600hp-initramfs*' -print -quit)
 if [ -z "$initramfs" ]; then echo 'FAIL WG2600HP initramfs absent'; fail=1; fi
 
-# Inspect the actual compiled DTB rather than trusting source text alone.
-dtb=$(find build_dir -type f -name 'qcom-ipq8064-wg2600hp.dtb' -print -quit 2>/dev/null)
-dtc=staging_dir/host/bin/dtc
-if [ -z "$dtb" ] || [ ! -x "$dtc" ]; then
-    echo 'FAIL compiled WG2600HP DTB or host dtc is absent'
-    fail=1
-else
-    tmp=$(mktemp) || exit 1
-    if "$dtc" -I dtb -O dts -o "$tmp" "$dtb" 2>/dev/null; then
-        gmac=$(grep -c 'qcom,nss-gmac' "$tmp" || true)
-        if [ "$gmac" -ge 2 ] && grep -q 'qcom,nss-common' "$tmp" && grep -q 'nec,wg2600hp' "$tmp"; then
-            echo 'PASS DTB: WG2600HP compatible, 2 NSS GMAC, NSS common'
-        else
-            echo "FAIL DTB: compatible/NSS GMAC/NSS common (gmac=$gmac)"
-            fail=1
-        fi
-    else
-        echo 'FAIL DTB decompilation'
-        fail=1
-    fi
-    rm -f "$tmp"
+# Inspect the compiled DTB embedded in the actual RAM image.
+# A loose build_dir DTB and host dtc are not guaranteed to be present.
+if [ -n "$initramfs" ]; then
+    python3 scripts/wg2600hp_verify_embedded_dtb.py "$initramfs" || fail=1
 fi
 [ "$fail" -eq 0 ] || exit 1
 printf 'PASS WG2600HP NSS image gate\n'
