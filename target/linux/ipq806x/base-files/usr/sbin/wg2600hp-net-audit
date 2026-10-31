@@ -1,0 +1,70 @@
+#!/bin/sh
+# WG2600HP end-to-end read-only boot/network audit.
+# Run as root after RAM boot: wg2600hp-net-audit
+# No interface changes, persistent writes, firmware flashing, or packet sends.
+
+board=$(cat /tmp/sysinfo/board_name 2>/dev/null)
+printf 'WG2600HP NETWORK RAM-BOOT AUDIT\n'
+printf 'BOARD=%s\n' "$board"
+if [ "$board" != "nec,wg2600hp" ]; then
+    echo 'FAIL: wrong board (WG2600HP / ipq8064 only)'
+    exit 2
+fi
+
+missing=0
+echo '--- 1. CPU MAC and DSA user devices ---'
+for dev in eth0 eth1 wan lan1 lan2 lan3 lan4; do
+    if [ -d "/sys/class/net/$dev" ]; then
+        oper=$(cat "/sys/class/net/$dev/operstate" 2>/dev/null)
+        printf 'PASS device %-5s state=%s\n' "$dev" "$oper"
+    else
+        printf 'FAIL device %s absent\n' "$dev"
+        missing=$((missing + 1))
+    fi
+done
+
+echo '--- 2. Kernel network initialization failures ---'
+errors=$(dmesg | grep -Ei 'qca8k.*(probe.*failed|lacks the required)|nss-gmac.*probe.*failed|DSA.*(failed|error)' || :)
+if [ -n "$errors" ]; then
+    printf '%s\n' "$errors"
+    echo 'FAIL kernel network initialization errors observed'
+else
+    echo 'PASS no recognized DSA/GMAC probe errors'
+fi
+
+echo '--- 3. Full interface state ---'
+ip -br link
+echo '--- 4. IPv4 addresses ---'
+ip -4 -br addr
+echo '--- 5. IPv4 routing table ---'
+ip -4 route
+
+echo '--- 6. OpenWrt LAN/WAN interface state ---'
+if command -v ubus >/dev/null 2>&1; then
+    ubus call network.interface.lan status 2>&1 || :
+    ubus call network.interface.wan status 2>&1 || :
+else
+    echo 'WARN ubus unavailable'
+fi
+
+echo '--- 7. NSS and ECM initialization ---'
+dmesg | grep -Ei 'nss core [01] booted|ECM init|nss-gmac.*Initialized NSS GMAC' | tail -25
+echo '--- 8. NSS/ECM counters (when available) ---'
+if [ -d /sys/kernel/debug/ecm ]; then
+    find /sys/kernel/debug/ecm -type f -name '*accelerated_count' \
+        -exec sh -c 'for f do printf "%s=" "$f"; cat "$f" 2>/dev/null; done' sh {} + 2>/dev/null
+else
+    echo 'WARN ECM debugfs unavailable'
+fi
+if [ -e /sys/kernel/debug/qca-nss-drv/stats/tunipip6 ]; then
+    echo 'PRESENT TUNIPIP6 debug stats'
+else
+    echo 'WARN TUNIPIP6 debug stats absent (acceleration not proven)'
+fi
+
+printf 'SUMMARY device_missing=%s\n' "$missing"
+echo 'NOTE: device presence is not proof of IPv4 forwarding, NSS offload or IPIP6 acceleration.'
+if [ "$missing" -ne 0 ] || [ -n "$errors" ]; then
+    exit 1
+fi
+exit 0

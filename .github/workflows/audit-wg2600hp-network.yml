@@ -1,0 +1,28 @@
+name: WG2600HP Network Cross-Audit
+
+on:
+  push:
+    branches:
+      - 'audit-wg2600hp-*'
+  workflow_dispatch:
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate audit code
+        run: |
+          sh -n target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit
+          test "$(git ls-files --stage target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit | awk '{print $1}')" = 100755
+          python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py tests/test_wg2600hp_cross_audit.py
+      - name: Verify cached firmware workflow
+        run: |
+          ruby -ryaml -e 'YAML.parse_file(ARGV.fetch(0)); puts "PASS firmware workflow YAML"' .github/workflows/build-wg2600hp-nss.yml
+          python3 scripts/wg2600hp_build_cache_check.py
+
+      - name: Audit WG2600HP GMAC-DSA-WAN/LAN-NSS chain
+        run: python3 scripts/wg2600hp_cross_audit.py
+      - name: Verify regressions are rejected
+        run: python3 -m unittest discover -s tests -p 'test_wg2600hp_cross_audit.py' -v
