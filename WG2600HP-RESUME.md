@@ -12,6 +12,8 @@
 - 5条件を厳守: 開始時既存記録確認／修正前ブート～通信横断照合／修正後後続影響・回帰／ビルド前に根拠記録・問題があればビルド禁止／ビルド後実機RAM起動・IPv4とNSS加速実証。
 - **正常動作の誤認禁止**: 以前のRAM版ではLAN→WAN IPv4通信PASS、NSS IPv4加速FAIL（ECM `FAIL_RULE=-2`, `lan1/br-lan/wan` NSS AE=-1、`ipv4_create_requests=0`）。固定IPIP6は未確認。
 - **2026-10-26成功版原本 `0031.patch` / `9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` は現在ない**。元パッチの回収を開発継続の前提としない。復元されたら追加比較する。
+- **旧パッチ追跡証拠（過去セッションの記録、今の実体検証ではない）**: 2026-10-25の保存先 `/home/owner/wg2600hp-25.12.5-nss/0031-two-cpu-hpoCalVD/0031.patch`、当時記録されたSHA256 `0338bd1ec94a1428031d5ab9070dd31839db1d80ade16ea5fff842b697205906`。ECM成功パッチの過去保存先 `/home/owner/wg2600hp-25.12.5-nss/openwrt-25.12.5/package/kernel/qca-nss-ecm/patches/9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch`。現実の存在・内容は未確認であり、「仮想環境に発見済み」と言わない。
+- **GitHub現在の実体照合**: 2026-10-31 隔離ブランチHEAD `5102a99f5482707c7eb8a16d537e69836c5766fd` のGitツリー全 **12,642エントリ**を再帰取得（`truncated=false`）し、上記 `0031.patch` と `9999-wg2600hp-0031-nss-dsa-ipv4-ram-tested.patch` の原本は**このブランチに存在しない**と確認。GitHubの他のコミット/ローカル上まで不在と断定しない。
 - **2026-10-31実際に読み取ったZIP**: `WG2600HP-IPQ8064-25.12.6-NSS(20261031-132923).zip`, SHA256 `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。内容は既存25.12.6 initramfs uImage、squashfs sysupgrade、SHA256SUMS、manifest、resolved.config の5エントリ。**修正版の新規ビルドではない。再提出不要。** GitHubにはハッシュ記録のみでバイナリは保存していない。
 
 ## 現在保存されている候補と検証
