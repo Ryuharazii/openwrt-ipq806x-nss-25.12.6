@@ -197,3 +197,11 @@
 - **修正後の読取検査**: GitHubから再取得した実パッチとDTS、ECM、dual-CPU候補、kernel設定で **11/11 項目 PASS（静的文字列照合）**。28/28 unified diffハンク行数・オフセットPASS。追加したPythonスクリプト自体の実行、patchツール適用、コンパイル、HW回帰は**未実施**。
 - **残リスク**: 巻戻し処理自体のハードウェア書込み失敗、8021Q→QCA逆方向切替途中の復旧不備、ECMとの統合、起動時タグ選択、WAN/LAN分離とRAM試験は未解決。
 - **G3判定: FAIL（ビルド禁止維持）**。新ファーム生成なし。旧RAM版のIPv4通信成功を今回修正のPASSに流用しない。
+
+## 2026-10-31 追加修正: QCA8K VLAN巻戻し失敗時の管理通信保護
+
+- **コード上の問題を確認**: staging `760-02` の `restore_vlan` でVLAN巻戻しに失敗しても、後続 `restore_hdr` が成功すれば `priv->mgmt_conduit` を復旧していた。ハードウェアVLAN構成が部分更新された状態でEthernet管理アクセスを再開するおそれがある。
+- **修正**: commit `a3d8bd36bc824053378ff6d2ff03e7433e1470f0`。`bool vlan_rollback_ok = true` を導入し、巻戻し失敗時はfalse。管理conduitは**VLAN巻戻し成功 AND header巻戻し成功**のときだけ復帰。失敗時はMDIO専用アクセスを維持。Linux 6.12.112対象の隔離stagingだけを修正し、ビルド対象へはマージしていない。
+- **再発防止**: commit `b866f7e4d42d1b063fdf754d121d4be8f935c676`、`tests/wg2600hp_qca8k_rollback_static.py` で両条件を静的チェック。GitHub再取得の6ファイルに対するJS静的照合を実行し **13/13 項目PASS**（QCA8K 28/28 unified-diffハンク個数・行数・offset確認を含む）。**Pythonスクリプトは未実行**。patch実適用、ARMコンパイル、実機回帰は未実施。成功報告は静的照合に限定。
+- **影響範囲/未解決**: 正常復帰では両成功条件ともtrueで従来通りCPU0 Ethernet管理を復旧。片方でも失敗すれば管理conduitを復旧しない（別経路MDIOは必要）。8021Q→QCA逆方向切替途中の失敗、部分的PVID更新、FW/GMAC/MTU、ECM階層/IF解決、LAN/WANの実パケット分離は未検証。
+- **必須ゲート**: G1の全起動シーケンス未完、G2の実ソース・回帰未完、**G3 FAILでビルド禁止維持**。既存RAMイメージのIPv4転送成功・NSS高速化失敗という状態は変わらず。ユーザー向けVLAN追加はなし。
