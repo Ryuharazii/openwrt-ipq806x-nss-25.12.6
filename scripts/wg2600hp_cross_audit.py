@@ -197,6 +197,21 @@ def main():
           all(x in device_block for x in
               ("kmod-qca-nss-gmac", "kmod-qca-nss-drv",
                "kmod-qca-nss-ecm-standard", "kmod-qca-nss-drv-tunipip6")))
+    check("Image gate enforces NSS Wi-Fi build configuration",
+          all(opt in image_gate for opt in (
+              "CONFIG_NSS_DRV_WIFI_ENABLE",
+              "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT",
+              "CONFIG_PACKAGE_kmod-ath10k-ct",
+              "CONFIG_PACKAGE_ath10k-firmware-qca99x0-ct")))
+    check("Image gate enforces WG2600HP wireless packages",
+          all(pkg in image_gate for pkg in (
+              "kmod-ath10k-ct",
+              "kmod-mac80211",
+              "ath10k-firmware-qca99x0-ct",
+              "ath10k-board-qca99x0",
+              "wpad-basic-mbedtls")))
+    check("Image gate selects WG2600HP-specific package manifest",
+          "'*-nec_wg2600hp.manifest'" in image_gate)
     check("Firmware gate inspects embedded *built* DTB",
           "wg2600hp_verify_embedded_dtb.py" in image_gate)
     check("Built DTB gate checks DSA CPU modes and conduits",
