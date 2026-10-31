@@ -5,7 +5,7 @@
 ## 固定条件
 
 - 対象は **NEC WG2600HP (IPQ8064)** のみ。WG2600HP3 (IPQ8062) を混同しない。
-- OpenWrt **25.12.6**, kernel **6.12.112**, NSS IPv4 LAN→WAN通信・加速成立が当面の優先順位。固定IPIP6のNSS加速が最終目標。
+- OpenWrt **25.12.6**, kernel **6.12.112**。**完成要件は有線IPv4、Wi-Fi、固定IPIP6の各NSS高速化（3件）**。現在は有線IPv4 LAN→WANのNSS加速を先に成立させるが、**Wi-Fi NSSを後から思いついた追加要件として扱わない**。ath10k/mac80211のNSS redirectと完全Wi-Fiオフロードは区別し、実機で動作・効果を測定する。
 - **ユーザー明示（2026-10-31）:「VLANは必要ない」**。WAN/LANでISPタグ・802.1Qサブインターフェース等の**ユーザー向けVLAN設定は不要**。新規VLAN設定を前提にしない。既存の `target/linux/ipq806x/base-files/etc/board.d/02_network` もWG2600HPに `lan1 lan2 lan3 lan4`/ `wan` を設定し、conduitはLAN→`eth1`、WAN→`eth0`。新たなユーザーVLAN設定は明示されていない。
 - **内部フレーム識別とユーザー用VLANを区別すること**。QCA8337/DSAにはポート識別が必要であり、候補の `qca-8021q` はユーザーがVLANを設定することとは別の**内部タグ方式**。標準QCAヘッダのままNSS L3処理を成立させられるかも独立して検証し、8021Qの導入を無条件の前提にしない。公開IPQ5018+QCA8337事例はNSSがQCA 2バイトヘッダを解析できないと報告（https://github.com/kuncy7/openwrt-nss-edma/blob/c3po-tag-8021q/README.ipq50xx.md）しているが、**WG2600HP/IPQ8064での再現は未確認**。
 - 作業ブランチ `wg2600hp-qca8021q-backport-isolated-20261031`。通常作業ブランチ `wg2600hp-nss-gmac-no-phy-20261031` へ未検証の候補をマージしない。default branchは古い参照版。
@@ -24,6 +24,13 @@
 - `backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch` / `760-05-ecm-nss-vlan-dsa-guards-pinned-CANDIDATE.patch`: pinned ECM `9acdcb05` 用、stagingのみ・OpenWrt固有400/401パッチ後未統合。
 - 公開 Linux `gregkh/linux v6.12.112` 該当7ソースへ、既存711/712 + 新760-01/02/03を順次 **unified-diff文脈リプレイ 43/43件一致**。これはパッチ適用文脈の一致のみで**コンパイル・起動・回帰の証明ではない**。
 - `tests/wg2600hp_qca8k_rollback_static.py`: 文字列・パッチハンクの静的チェックを追加済み。GitHub追加後の**実Python実行は未確認**。
+
+## 2026-10-31 Wi-Fi NSS開発のコード証拠
+
+- `diff-wg2600hp-nss` には `CONFIG_NSS_DRV_WIFI_ENABLE=y` と `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT=y`。`package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch` は `nss_virt_if_create_sync` と `nss_virt_if_tx_buf` を含む。DTSはPCIe Wi-Fi 2台と両方のNVMEMキャリブレーションを記述。**これはソース存在・ビルド選択のみの根拠で、実機Wi-Fi NSS加速PASSではない。**
+- `package/kernel/mac80211/Makefile` はNSS enableの生成フラグを持つ一方、`PKG_CONFIG_DEPENDS` から `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT` が抜けていた。`include/package.mk` は `PKG_CONFIG_DEPENDS` から構成スタンプを生成する。隔離ブランチ commit `be60ea7f698eb2b74e1fdd0b97a930ae2ba84eb8` で依存を追加。
+- `scripts/wg2600hp_cross_audit.py` にWi-Fi NSS選択、キャッシュ再構成依存、redirectパッチ、PCIeの2無線を検査する5項目を追加。commit `c7c89303d75db9df606d7ded1b0cf72c73724aac`。`tests/test_wg2600hp_cross_audit.py` に2つの異常系を追加・修正（commits `84c46818...`, `2c07edcb2bb0cfb510420145aa01404cb9dba7c5`）。関連7ファイルをGitHub読み戻し、**11/11 JS静的照合**（2つの負例を含む）PASS。**Pythonスクリプト実行・mac80211実ビルド・無線接続・NSS redirect計測は未実施。**
+- 既存5ゲートのビルド禁止を尊重。未解決の有線DSA/ECM、Wi-Fi NSS redirect起動・カウンタ測定、固定IPIP6の課題を残す。
 
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
