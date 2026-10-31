@@ -265,7 +265,7 @@ Do not enable new tag protocol on real hardware.
 +
 +		ret = qca8k_set_tag_8021q_vlan_mode(priv, true);
 +		if (ret)
-+			goto restore_hdr;
++			goto restore_vlan;
 +
 +		priv->tag_proto = proto;
 +		ret = dsa_tag_8021q_register(ds, htons(ETH_P_8021Q));
