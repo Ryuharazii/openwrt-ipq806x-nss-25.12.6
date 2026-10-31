@@ -32,6 +32,13 @@
 - `scripts/wg2600hp_cross_audit.py` にWi-Fi NSS選択、キャッシュ再構成依存、redirectパッチ、PCIeの2無線を検査する5項目を追加。commit `c7c89303d75db9df606d7ded1b0cf72c73724aac`。`tests/test_wg2600hp_cross_audit.py` に2つの異常系を追加・修正（commits `84c46818...`, `2c07edcb2bb0cfb510420145aa01404cb9dba7c5`）。関連7ファイルをGitHub読み戻し、**11/11 JS静的照合**（2つの負例を含む）PASS。**Pythonスクリプト実行・mac80211実ビルド・無線接続・NSS redirect計測は未実施。**
 - 既存5ゲートのビルド禁止を尊重。未解決の有線DSA/ECM、Wi-Fi NSS redirect起動・カウンタ測定、固定IPIP6の課題を残す。
 
+## Wi-Fi NSS redirect 実コード修正（2026-10-31 追加）
+
+- **具体的な原因**: mac80211 NSS RX redirectの `skb_push(skb, ETH_HLEN)` 後、`nss_virt_if_tx_buf()` でエラーとなって通常処理に戻る際にデータ位置を復元していなかった。
+- **コード修正実施**: 隔離ブランチ commit `309210e2e23e7eb01e6f101aa70861bbbaff5b69`、headroom不足時はNSSを呼ばず通常経路へ、NSS送信失敗時は `skb_pull(skb, ETH_HLEN)` 後に通常経路へ。成功経路は従来のまま。mac80211 `990` パッチ13ハンクの行数・オフセットを確認。
+- **回帰検証**: cross auditと2つの負例を追加（`a13a3a3`, `b25a6dd`）、GitHub取得したソースで JS静的照合 **6/6 PASS**。Python実行・patch実適用・コンパイル・Wi-Fi/NSS実機計測は未完。**G3 FAILのままでビルド・書込み禁止**。
+- **次の優先順位**: pinned NSS driverのpacket ownership契約とmac80211 6.18.55バックポート適合性を追加確認し、DSA/ECM/起動時タグ切替と同時にWi-Fiを検証すること。新規VLANユーザー設定不要。
+
 ## 次の作業 (ユーザーに同じ説明やファイルを求めず着手)
 
 1. 隔離候補 `760-02` の 8021Q→QCA 失敗時のロールバックを検討し、元Linux 6.12.112の関数順、GMAC/DSA CPU0・6/port FDB/VLAN/ECMデータパスまで横断照合。
