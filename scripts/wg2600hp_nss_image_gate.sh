@@ -65,6 +65,8 @@ if [ -z "$initramfs" ]; then echo 'FAIL WG2600HP initramfs absent'; fail=1; fi
 # A loose build_dir DTB and host dtc are not guaranteed to be present.
 if [ -n "$initramfs" ]; then
     python3 scripts/wg2600hp_verify_embedded_dtb.py "$initramfs" || fail=1
+    # Inspect the compiled ARM modules, not merely the package manifest.
+    python3 scripts/wg2600hp_verify_wifi_nss_binary.py "$initramfs" || fail=1
 fi
 [ "$fail" -eq 0 ] || exit 1
 printf 'PASS WG2600HP NSS image gate\n'
