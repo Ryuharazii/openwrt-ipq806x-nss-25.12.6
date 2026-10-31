@@ -144,6 +144,16 @@ class CrossAuditTest(unittest.TestCase):
             result.stdout,
         )
 
+    def test_detects_missing_explicit_ath10k_ct_from_target(self):
+        self.mutate(
+            "diff-wg2600hp-nss",
+            "CONFIG_PACKAGE_kmod-ath10k-ct=y",
+            "# CONFIG_PACKAGE_kmod-ath10k-ct is not set",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("FAIL WG2600HP build selects NSS Wi-Fi redirect", result.stdout)
+
     def test_detects_missing_wifi_package_image_gate(self):
         self.mutate(
             "scripts/wg2600hp_nss_image_gate.sh",
