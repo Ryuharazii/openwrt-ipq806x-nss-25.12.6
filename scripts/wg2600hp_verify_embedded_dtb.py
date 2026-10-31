@@ -111,7 +111,7 @@ def check(path):
     # qca-nss-gmac not to attach a non-existent MDIO PHY.
     gmacs = {}
     for name, props in nodes.items():
-        if b'qcom,nss-gmac' not in props.get('compatible', b'').split(b'\\0'):
+        if b'qcom,nss-gmac' not in props.get('compatible', b'').split(b'\0'):
             continue
         raw_id = props.get('qcom,id', b'')
         if len(raw_id) == 4:
