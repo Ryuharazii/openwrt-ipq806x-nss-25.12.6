@@ -531,3 +531,9 @@
 - `CONFIG_NSS_DRV_VLAN_EXPOSED=NO`（package Config.inが`#config NSS_DRV_VLAN_ENABLE`とコメント化、WG2600HP選択設定に`...=y`なし）。ECM標準版でVLAN階層を扱えることと、NSS VLAN IF/FWが処理できることは別条件。
 - **未確定**：現行実機で登録されるnetdevとDSA user netdev/GMAC netdevの対応、ECMからNSSへの最終IFの割当、QCA 802.1Qタグの実FWデコード、VLAN内包NSSパケット、IPv4 CREATE/ACK。これらを実機で裏付けていない。従前RAM実測`AE IF=-1`/`NSS CREATE=0`は解消を主張しない。今回のソース監査で次段の具体契約をさらに抽出する診断を追加し、結果待ち。
 - G1/G2未完了、**G3 FAIL**。通常作業ブランチと既存WAN/LAN・ユーザーVLAN設定変更なし。ファームビルド・実機起動・フラッシュは未実施。
+
+## 2026-11-01 固定版IF登録の実関数抽出：監査スクリプト修正
+
+- GitHub Actions [#41275626385](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41275626385)：実pinのNSS driver/GMACとそれぞれの9/10パッチ適用PASS。追加の行番号抽出で`nss_cmn.c`、`nss_data_plane/nss_data_plane_gmac.c`は取得成功。NSS driver登録関数では`nss_gmac_get_netdev_by_macid(if_num)`で物理GMACのnetdevを取り、無ければ登録しない。`nss_gmac_override_data_plane(netdev,...)`へ渡して物理IF handlerを設定。DSA user netdevを直接登録する経路は、この取得部分には見えていない。
+- 同runは**failure**：ソース不整合ではなくPython audit内`("struct net_device *nss_gmac_get_netdev_by_macid(")`の単一要素タプル末尾カンマ欠落により、GMACの識別子抽出を文字単位ループと誤処理した（`PIN_IF_CONTRACT ... 's' count=617`）。カンマを修正してリトライ。**前runをPASSとは記録しない**。
+- 以降も固定pinの検査までで、FW内部のQCA VLAN/タグ解釈、ecm規則作成、実機起動、IPv4、Wi-Fi、IPIP6加速の立証には至らず。G1/G2未完、**G3 FAIL**。ファームビルド・書込みなし。

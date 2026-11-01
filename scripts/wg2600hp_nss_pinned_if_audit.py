@@ -179,7 +179,7 @@ def log_pinned_path_contract(src, category):
         (
             "gmac",
             "ipq806x/nss_gmac_tx_rx_offload.c",
-            ("struct net_device *nss_gmac_get_netdev_by_macid("),
+            ("struct net_device *nss_gmac_get_netdev_by_macid(",),
             16,
         ),
     )
