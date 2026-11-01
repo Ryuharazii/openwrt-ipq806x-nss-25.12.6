@@ -1,0 +1,54 @@
+From: WG2600HP isolated data-path review 2026-11-01
+Subject: [CANDIDATE 760-10] qca-8021q: route CPU TX on bridge VID regardless of offload mark
+
+NEVER APPLY to the build or production tree without DSA/ECM/NSS
+cross-path, compile, RAM boot and LAN/WAN forwarding verification.
+The DSA 802.1Q user-facing VLAN interface is NOT introduced.
+Depends on 760-01 qca-8021q tagger and its 760-02/03 switch integration.
+
+dsa_tag_8021q_bridge_join() replaces a user's standalone VID
+with its bridge VID. The staged qca_8021q_xmit() used bridge VID
+only if skb->offload_fwd_mark was set, so CPU-routed IPv4 output
+would still use the deleted standalone VID and risk dropping.
+Align bridge VID selection with staged ECM 760-04 for VLAN-unaware
+bridges. Handle br==NULL explicitly for offload_fwd_mark.
+
+--- a/net/dsa/tag_qca_8021q.c
++++ b/net/dsa/tag_qca_8021q.c
+@@ -65,18 +65,24 @@
+ 	u16 tx_vid = dsa_tag_8021q_standalone_vid(dp);
+ 	u8 pcp;
+ 
+-	if (skb->offload_fwd_mark) {
+-		unsigned int bridge_num = dsa_port_bridge_num_get(dp);
+-		struct net_device *br = dsa_port_bridge_dev_get(dp);
+-
+-		/* A VLAN-aware bridge carries its own VID; the switch
+-		 * forwards on that one.
+-		 */
+-		if (br_vlan_enabled(br))
+-			return skb;
+-
+-		tx_vid = dsa_tag_8021q_bridge_vid(bridge_num);
+-	}
++	struct net_device *br = dsa_port_bridge_dev_get(dp);
++
++	/*
++	 * An offloaded frame in a VLAN-aware bridge already carries the
++	 * bridge VLAN. Do not add a tag_8021q VLAN on top.
++	 */
++	if (skb->offload_fwd_mark && br && br_vlan_enabled(br))
++		return skb;
++
++	/*
++	 * dsa_tag_8021q_bridge_join() replaces the standalone VID with
++	 * a bridge VID. Routed IPv4 output has no offload_fwd_mark, but
++	 * must use the same bridge VID or the switch will drop the frame.
++	 * Match ecm_interface_dsa_8021q_conduit's VID selection.
++	 */
++	if (br && dp->bridge && dp->bridge->tx_fwd_offload &&
++	    !br_vlan_enabled(br))
++		tx_vid = dsa_tag_8021q_bridge_vid(dsa_port_bridge_num_get(dp));
+ 
+ 	/* An 802.1Q upper of the port (wan.35 for a PPPoE ISP, wan.99 next
+ 	 * to the port's place in a VLAN-unaware bridge) already tagged the
