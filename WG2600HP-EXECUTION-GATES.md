@@ -566,3 +566,10 @@
 - NSS固有の`NSS_DRV_VLAN_ENABLE`は無効であるものの、**NSS IPv4 CREATE構造へのVLAN情報指定はdriver ABIとして存在し、ECM側から書込む実装もある**。よって`NSS_DRV_VLAN_ENABLE=n`のみを理由にIPv4ルール経路を阻害と決めつけない。ただし**ファームウェアがこのルールを受け取り適用できるか、QCA8021qタグが物理入力で成立するか**は未証明。テストログは`ECM_IPV4_RULE_SCOPE=ABI_ONLY NOT_NSS_FW_SUPPORTED NOT_NSS_CREATE_ACK`と明示。
 - 同一CI：ECM固定pin＋11件、OpenWrt全kernel586パッチ、DSA候補7/7、選択DSA13パッチ、NSS driver9件・GMAC10件が継続PASS。FW2個の正確なファイル長とSHA256、`nss_fw_version.h`のバージョン宣言11.4、READMEでのSynology RT2600ac由来の記載を確認。バイナリ解析禁止のライセンス文言を尊重し、**FW内解析によるタグ処理証明を主張しない**。
 - 次の残課題：DSA/ECM→NSS IF解決・NSS物理GMAC VLANタグ処理、IPv4 CREATE/ACKの実機計測、電源投入から全起動段階の確認、Wi-Fi、固定IPIP6。通常ブランチ/WAN/LAN/VLAN設定不変更。**G1/G2未完、G3 FAIL、ファームビルド・フラッシュなし**。
+
+## 2026-11-01 組込み隔離ブランチのG2阻害要因に具体修正を適用
+
+- 新しい**実際のOpenWrtソース組込みブランチ**`wg2600hp-nss-integrated-candidate-20261101`では`760-01/02/03/06/08/09/10/11` DSA + `760-04/05` pinned ECM + `760-07`相当のDTS/Kconfig選択を本物のビルド入力ディレクトリへ組み込み済み。2026-11-01 [#41276859700](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276859700) でファイル実体とCPU0/CPU6、WAN/LAN設定不変をチェックPASS。**通常ブランチは変更せず、ユーザーVLAN追加なし**。
+- 残留問題として`qca8k_tag_8021q_vlan_add()`でVLANを先に追加した後にPVID書込みが失敗すると、`tag_8021q_pvid`キャッシュとVLAN membershipが残る。**実修正**`760-12-net-dsa-qca8k-vlan-rollback-CANDIDATE.patch`をstageおよび有効なkernel pendingに追加。PVIDレジスタ2つとVTUポート会員の元状態・タグ付けモードを取得し、失敗時に元の値への復元を**試行**、元のエラーコードを維持、復元I/O失敗はログ出力する。すべてのMDIO故障で復元を保証するものではない。
+- 実証コミット`ab9a24f64b7d2e6dd5a77c9c132aec1ac89a0d7c`、[Actions #41277303359](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41277303359)、job`124761981549` **completed/success**。公式Linux6.12.112 sha256固定原本の実展開後に、**OpenWrtカーネル全594パッチの連続適用PASS**（backport277+pending160+hack56+ipq806x101）、`DSA_PROTOCOL_ID_UNIQUE=PASS` 29=BRCM,30=QCA、760-12の実コード存在、DTS/Kconfig/ECMのソース組込みスコープを検証。既存patchは13件fuzz/offset調整があったため、全594件がfuzz0で一致したとの主張はしない。
+- **G1：旧RAM起動を部分実証、BootROM/U-Bootの全ログと新候補の起動は未確認**。**G2：新たに実パッチ修正＋全kernel実適用まで前進したが、ARM実コンパイル、失敗注入・MDIO書込み失敗、dual CPU VLAN分離/MTU/NSS/IPv4/Wi-Fi/IPIP6回帰は未実施**。**G3：FAILを維持**。FW ARMビルド・RAM起動・実機書込みは未実施。通常ブランチへ無検証マージしない。静的テストPASSをG2ハードウェアPASSに変換しない。

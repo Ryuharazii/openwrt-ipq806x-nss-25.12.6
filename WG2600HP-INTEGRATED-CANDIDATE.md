@@ -21,3 +21,7 @@ Known unresolved: 760-08/09 explicitly acknowledge switch VLAN partial hardware 
 - `qca8k_port_set_pvid()` now snapshots egress and VLAN CTRL0 registers and attempts restoration if either write fails.
 - `qca8k_tag_8021q_vlan_add()` snapshots previous per-port VTU membership and VLAN egress mode, restores software PVID and attempts membership restoration on error (preserves prior existing VLAN entry).
 - This is **best-effort rollback**, NOT atomic hardware transaction. MDIO failure may also prevent recovery. HW fault injection, ARM compile and runtime remain untested. G2 and G3 must not be upgraded on source proof.
+
+## Verified CI source chain after 760-12
+
+[GitHub Actions #41277303359](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41277303359): full upstream 6.12.112 kernel unpack, all **594** active OpenWrt patches applied, DSA tag ID 29/30 unique, new rollback code found, assembly guard PASS. This is not a kernel compile, fault injection, or hardware safety proof. G1/G2 incomplete; G3 FAIL.

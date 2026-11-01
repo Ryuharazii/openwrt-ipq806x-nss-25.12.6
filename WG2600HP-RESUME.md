@@ -123,3 +123,8 @@
 - 新CI [#41276237249](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276237249) `completed/success`：実source pin NSS driver`3cfb9f43`＋9パッチ、GMAC`17176794`＋10パッチ、ECM`9acdcb05`＋既存9/隔離760-04/05の11パッチ、Linux6.12.112へのOpenWrt586パッチ＋隔離DSA7パッチ、DTS設定760-07単独適用がPASS。**すべてソース/host-onlyの検証であって起動試験ではない**。
 - 新発見：ECM ported/nonported IPv4 CREATEの`NSS_IPV4_RULE_CREATE_VLAN_VALID`とprimary VLANタグの両方向設定は、実pin driverの`exports/nss_ipv4.h`の対応ABIと整合。専用`NSS_DRV_VLAN_ENABLE=n`でもIPv4ルール構造のVLANフィールドは存在するため、一律にFW非対応とは断定不可。**FWがQCA 802.1Q物理タグを解析する証拠やCREATE/ACK/RX-TX統計は依然無し**。FW本体の内部解析はしない。
 - 旧実機の`AE IF=-1`、`FAIL_RULE=-2`、NSS CREATE=0は未解決。次は実機のDSA→GMACの階層、ECM NSS IF解決とFW VLANタグ受信を、電源投入→起動と通信・オフロード実測で証明する前提。**G1/G2未完、G3 FAIL**。ユーザーに既存条件の再説明を求めず、VLAN追加/ルーティング設定変更/ARMファームビルド/フラッシュを無断実施しない。
+
+## 最新 2026-11-01 隔離統合進展
+
+- Active source-assembled candidate: `wg2600hp-nss-integrated-candidate-20261101` HEAD検証`ab9a24f64b7d2e6dd5a77c9c132aec1ac89a0d7c`。初回組込み検査 [#41276859700](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276859700)、新VLAN/PVID復旧候補付き594パッチ完全ソース適用PASS [#41277303359](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41277303359)。パッチ実体は`target/linux/generic/pending-6.12/760-12-net-dsa-qca8k-vlan-rollback-CANDIDATE.patch`。ステージにも同じ実体を保存。
+- Next actual blocker: C/ARM compile and fault-injection proof of `760-12` and switch recovery, without assuming MDIO errors are always recoverable; assess G1 BootROM/U-Boot and changed runtime regression; no new firmware build/flash without gate. G1/G2 incomplete, G3 FAIL.
