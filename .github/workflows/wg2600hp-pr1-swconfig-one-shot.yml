@@ -68,6 +68,19 @@ jobs:
           strings -a "$fw/qca-nss1-retail.bin" | grep -Fq 'NSS.AK.11.2-9-002-R'; record "$?" STEP2_FW1_VERSION
           test "$(git rev-parse HEAD)" = "$REF_SHA" && git diff --quiet HEAD -- "$fw/qca-nss0-retail.bin" "$fw/qca-nss1-retail.bin"; record "$?" STEP2_UNMIXED_FW
           test "$bad" -eq 0
+      - name: Validate NSS GMAC source pin and correct archive checksum in isolated clone
+        run: |
+          cd "$SRC"
+          p=package/qca-nss/qca-nss-gmac/Makefile
+          grep -Fxq 'PKG_SOURCE_VERSION:=171767947467662f2407d0cfff26dfb136c3fb4a' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=21f8a0ce6672f9dfae9eca6490b19e49cfc51f6fdc5ba48db28c20a92af81822' "$p"
+          # Repacked from the pinned upstream Git commit on the same runner in
+          # failed run 41310034434; both cached and freshly generated archives
+          # had this SHA256. The OpenWrt download stage rechecks it.
+          sed -i 's/^PKG_MIRROR_HASH:=21f8a0ce6672f9dfae9eca6490b19e49cfc51f6fdc5ba48db28c20a92af81822$/PKG_MIRROR_HASH:=91f2189ee0410bd9cd3bd85f4fd70ddc7799f85e27d2a8246e0b5835b2b97315/' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=91f2189ee0410bd9cd3bd85f4fd70ddc7799f85e27d2a8246e0b5835b2b97315' "$p"
+          printf 'STEP2_GMAC_ARCHIVE_PIN\tVERIFIED_FROM_RUN_41310034434\n' >> build-gates.tsv
+
       - name: Configure WG2600HP only
         run: |
           cd "$SRC"
@@ -90,6 +103,7 @@ jobs:
       - name: Build firmware
         run: |
           cd "$SRC"
+          set -o pipefail
           timeout 2h bash -c 'make -j$(nproc) || make -j1 V=s' 2>&1 | tee build.log
 
       - name: Verify and stage WG2600HP images
