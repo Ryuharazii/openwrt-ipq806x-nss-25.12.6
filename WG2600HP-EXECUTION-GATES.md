@@ -472,3 +472,10 @@
 - GitHub Actions [#41274359761](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274359761)：Linux6.12.112実ソースへ既存711/712の4本＋隔離`760-01/02/03/06/08/09/10/11`の8本を順次適用。11/12はGNU `patch --fuzz=0` PASS。**唯一`760-06`はGNU strict FAIL**、ただし一時領域での`git apply` PASS、差分再生成後GNU strict dry-run PASS。後続`760-08/09/10/11`は、このdiagnostic git apply後の実ソース上でGNU strict PASS。テスト全体は期待どおりFAILのまま終了。
 - `760-06`だけ、実ソースから再生成されたcanonical diffに旧説明ヘッダーを保持して差し替え。旧新の追加行・削除行をソース文字列として照合一致（**変更内容は同一**）。次回CIの実適用を確認してから選択12本の合否を確定する。通常ブランチ、本体ARMカーネル、WAN/LAN設定・ユーザーVLANを変更しない。
 - **範囲**：素の上流Linux6.12.112での選択パッチに限定。OpenWrt他のgeneric pendingおよびtarget patchを全部含むテスト、ARM compile、Boot、RAM実機NSS/IPv4、Wi-Fi、固定IPIP6は未検証。G1/G2未完、**G3 FAIL**、新FWビルド/フラッシュ不可。
+
+## 2026-11-01 第23セッション：DSA選択12本の厳格な順次ソース適用PASS（限定証明）
+
+- 検証コミット `46f4646d3dfe92cab1c30ef79fa6adde1168d25b`。GitHub Actions [#41274413514](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274413514) `completed/success`、該当ジョブ`124753561810`の全ステップ`success`および実ログを確認。`DSA_PATCH_CHAIN=PASS 7 verified upstream source files, 12 patch steps`。Linux`gregkh/linux v6.12.112`の7ファイルをGit blob SHAまで検証し、GNU `patch --fuzz=0`でOpenWrt既存711-01/02/03・712、および隔離760-01/02/03/06/08/09/10/11を**全12本、順番に一時ソースへ実適用PASS**。途中の診断git-applyフォールバックは今回は不要。前回のGNU strict不一致は`760-01`と`760-06`のcanonical diff再生成で解消し、旧と新のパッチの追加/削除行が完全に同一であることを確認済み。
+- ECM `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa` 固定原本+既存9本+隔離760-04/05の実適用もこのジョブで引き続きPASS。host guard C 12/12、ネット診断unittest 8/8、ECM guard unittest 6/6もPASS。既知旧760-10負例の検出は正常な負試験であり「本版動作FAIL」と混同しない。
+- **境界は厳守**：この選択12本のみで、OpenWrtの`generic/pending-6.12`と`ipq806x/patches-6.12`全件適用後の整合ではない。ARMコードコンパイル・実ビルド、Boot ROM→U-Boot→DSA/GMAC/ECM→NSS経路全起動、RAM実機 IPv4/NSS CREATE-ACK、Wi-Fi、固定IPIP6は未実施。試験成功をハードウェアPASSへ格上げしない。**G1/G2未完了、G3 FAIL、FWビルド・書込み禁止**。
+- 通常作業ブランチやボードLAN/WAN設定・ユーザーVLAN設定の変更なし。次の合格条件は全OpenWrtパッチ適用後のコード整合、NSS FW VLANタグ解釈とIF階層を再検証してからG3へ進むこと。
