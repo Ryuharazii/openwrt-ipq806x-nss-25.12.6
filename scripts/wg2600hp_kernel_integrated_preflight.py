@@ -102,6 +102,59 @@ def apply_patch(linux, patchfile, strict):
     msg = p.stdout.decode("utf-8", errors="replace")
     return p.returncode == 0, msg
 
+def cross_compile_ecm_objects(linux):
+    """Compile exact pinned ECM source against isolated patched ARM kernel."""
+    cc = "arm-linux-gnueabihf-"
+    if not shutil.which(cc + "gcc"):
+        say("ECM_ARM=FAIL no ARM cross compiler")
+        return 41
+    env = {**os.environ, "ARCH": "arm", "CROSS_COMPILE": cc,
+           "KBUILD_BUILD_USER": "wg2600hp-audit", "KBUILD_BUILD_HOST": "isolated"}
+    def make(args, label):
+        say("ECM_KERNEL_PREPARE=START " + label)
+        try:
+            p = subprocess.run(["make", "-C", str(linux), "-j2"] + args, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               text=True, timeout=180)
+        except subprocess.TimeoutExpired:
+            say("ECM_KERNEL_PREPARE=FAIL timeout " + label)
+            return False
+        if p.returncode:
+            say("ECM_KERNEL_PREPARE=FAIL " + label + "\n" + p.stdout[-8000:])
+            return False
+        say("ECM_KERNEL_PREPARE=PASS " + label)
+        return True
+    if not make(["multi_v7_defconfig"], "multi_v7_defconfig"):
+        return 42
+    features = ("NET_DSA", "NET_DSA_QCA8K", "NET_DSA_TAG_QCA_8021Q",
+                "VLAN_8021Q", "BRIDGE", "BRIDGE_NETFILTER", "NF_CONNTRACK",
+                "NETFILTER_XTABLES", "IP_NF_IPTABLES", "IP6_NF_IPTABLES")
+    opts = [v for item in features for v in ("-e", item)]
+    p = subprocess.run(["scripts/config"] + opts, cwd=linux,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if p.returncode:
+        say("ECM_KERNEL_CONFIG=FAIL " + p.stdout)
+        return 43
+    if not make(["olddefconfig"], "olddefconfig"):
+        return 44
+    if not make(["prepare"], "prepare"):
+        return 45
+    script = ROOT / "scripts/wg2600hp_ecm_pinned_preflight.sh"
+    say("ECM_ARM_BUILD=START pinned ECM objects; NOT firmware")
+    try:
+        r = subprocess.run(["bash", str(script), "--arm-kernel", str(linux)],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           text=True, env=env, timeout=270)
+    except subprocess.TimeoutExpired:
+        say("ECM_ARM_BUILD=FAIL timeout")
+        return 46
+    say(r.stdout[-15000:])
+    if r.returncode:
+        say(f"ECM_ARM_BUILD=FAIL code={r.returncode}")
+        return 47
+    say("ECM_ARM_BUILD=PASS pinned ECM objects for ARM")
+    return 0
+
 def cross_compile_dsa_objects(linux):
     """Compile selected real ARM objects; never generate a firmware image."""
     import shutil
@@ -294,7 +347,12 @@ def run():
             return 29
         say("OPENWRT_ROLLBACK_CANDIDATE=SOURCE_PRESENT not hardware verified")
         say(f"DSA_STAGED_AFTER_FULL_OPENWRT=PASS {stage_ok}/{len(STAGED)}")
-        if "--arm-objects" in sys.argv[1:]:
+        if "--arm-ecm" in sys.argv[1:]:
+            status = cross_compile_ecm_objects(linux)
+            if status:
+                return status
+            say("FULL_SOURCE_SCOPE=ARM_ECM_OBJECTS_ONLY NO_FIRMWARE NO_BOOT NO_NSS_ACK")
+        elif "--arm-objects" in sys.argv[1:]:
             result = cross_compile_dsa_objects(linux)
             if result:
                 return result

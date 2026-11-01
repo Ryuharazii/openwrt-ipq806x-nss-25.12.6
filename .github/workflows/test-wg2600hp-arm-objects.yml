@@ -1,8 +1,6 @@
 name: WG2600HP isolated ARM DSA object compilation (not firmware)
 
 on:
-  push:
-    branches: [wg2600hp-nss-integrated-candidate-20261101]
   workflow_dispatch:
 
 permissions:

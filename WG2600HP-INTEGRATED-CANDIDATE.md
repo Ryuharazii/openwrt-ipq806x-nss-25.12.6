@@ -46,3 +46,15 @@ Prior to its actual run result, ARM compilation remains UNKNOWN.
 
 - CI [#41279782972](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279782972) PASS at `5cde09a756e5f1eb5a33e6e860c84f0dec6d27a7`: all 594 patches applied to pinned Linux6.12.112, four real ARM DSA objects built and verified as ARM ELF, and eight modeled failure/success cases using original patched C functions pass. This **does not** prove hardware rollback or full firmware integration.
 - G1 incomplete; G2 static/ARM/modeled coverage improved, hardware/unwind/offload not closed; G3 FAIL. Do not flash.
+
+## ECM build-specific finding and source correction (2026-11-01)
+
+The active OpenWrt ECM patch directory already contains 760-04/05; old
+`scripts/wg2600hp_ecm_pinned_preflight.sh` appended both staged files
+again, causing guaranteed duplicate application. Fixed to compare stage
+with package and apply all 11 package patches exactly once.
+
+The only automatic integrated CI now targets ECM ARM compilation; prior
+ARM DSA and source-assembly tests are manual to avoid repeating completed
+work. This does not generate or flash any firmware. ECM compilation result
+must be taken from CI logs; no assumption of PASS.

@@ -1,7 +1,5 @@
 name: WG2600HP isolated assembly gate (no firmware build)
 on:
-  push:
-    branches: [wg2600hp-nss-integrated-candidate-20261101]
   workflow_dispatch:
 permissions:
   contents: read
