@@ -43,5 +43,7 @@ jobs:
         run: python3 scripts/wg2600hp_dts_config_staging_preflight.py
       - name: Exact OpenWrt kernel archive + complete generic and ipq806x patch chain (SOURCE ONLY)
         run: python3 scripts/wg2600hp_kernel_full_patch_preflight.py
+      - name: Audit exact NSS driver GMAC pins and physical interface mapping (source only)
+        run: python3 scripts/wg2600hp_nss_pinned_if_audit.py
       - name: Explicit scope boundary
         run: echo "HOST-ONLY PASS does not establish ARM kernel build, boot, IPv4 or NSS offload."

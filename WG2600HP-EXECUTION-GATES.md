@@ -516,3 +516,10 @@
 - 直接確認：隔離コミット`eb6cc16f9fe7849b16e3c022e58712499bf56ae9`、GitHub Actions [#41275220784](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41275220784)、job`124755934439` `completed/success`。ソース・ログに`DTS_CONFIG_76007_APPLY=PASS strict fuzz0, isolated copy`、CPU0→GMAC1/rgmii・CPU6→GMAC2/sgmii、両側`dsa-tag-protocol="qca-8021q"`、`NET_DSA_TAG_QCA_8021Q=y`、標準QCAタグger保持の静的チェックPASSを確認。**ただし設定変更は一時ファイルのみで、通常ビルドに760-07は未統合。**
 - 同じCIで再度、OpenWrtの固定SHA256が一致するLinux6.12.112全原本へOpenWrt既存586パッチ（backport277/pending152/hack56/ipq806x101）を公式順に適用しPASS。既存12件のfuzz/offsetは残るため完全fuzz0の全件PASSとは表現しない。追加のステージ760-02/03/06/08/09/10/11は**7/7 strict fuzz0 PASS**、プロトコルID **29=BRCM_LEGACY_FCS、30=QCA_8021Q** 重複なし。選択DSA13本の実適用、ECM固定原本＋既存9本＋760-04/05の11本適用PASSも継続。スタンドアロンのDTS/config候補`760-07`の元差分で失敗した3ハンクは原本ファイルからcanonical unified diffを再生成、追加/削除行に変化がないことを検査して解決した。
 - **未達**：これらは全kernelソースへのパッチ適用・設定差分の適用検査であり、ARMコンパイル、GMAC/DSA起動・電源投入から全経路の実動作、WAN/LAN通信、NSS CREATE/ACK・RX/TX増分、Wi-Fi、固定IPIP6を確認したものではない。NSSとQCAタグのFW互換性が未証明、stage 760-02以降は通常kernel patchに存在しない。**G1/G2未完了、G3 FAIL。ファームビルド、RAM実機テスト、新フラッシュ書込みは未実施**。既存通常作業ブランチ、ネットワーク設定を変更しない。
+
+## 2026-11-01 第25セッション：NSS実装pinのIF解決を確認するソース監査ゲート追加（未判定）
+
+- 開始時点の実証：Linux6.12.112全kernelにOpenWrt 586件＋DSA隔離7件のパッチ適用PASS、ECM固定原本＋既存9件＋隔離760-04/05がPASS、両CPUポートDTS設定候補760-07の単独strict適用PASS（台帳/CI [#41275220784](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41275220784)）。**従来実機のECM IF=-1、FAIL_RULE=-2、NSS CREATE=0は未解消**。G1/G2未完、G3 FAIL。
+- 作業版Makefileでpinを再照合：qca-nss-drv `3cfb9f43`、qca-nss-gmac `171767947467662f2407d0cfff26dfb136c3fb4a`。対応する正確なCodelinaroコミットを取得、SHA照合後、各OpenWrt package/patchesを一時領域にstrict-fuzz0で適用して、`nss_cmn_get_interface_number_by_dev`、`subsys_dp_register`、`nss_gmac_get_netdev_by_macid`など物理IFの参照先を行番号付きで出力する`scripts/wg2600hp_nss_pinned_if_audit.py`を追加。ダウンロードや正確なSHA取得ができなければ BLOCKED としてPASS禁止。CIログ未確認の段階で正確なpinのコード詳細を断定しない。
+- 既存repoの`NSS_DRV_VLAN_ENABLE`はConfig.inでコメントアウト、`diff-wg2600hp-nss`にはenable指定なし。一方ECM標準variantの`ECM_INTERFACE_VLAN_ENABLE=y`はNSS VLANノード登録やFWが対応している証拠ではない。実パケットタグ受理の証拠は別途必要。
+- 通常作業ブランチ/ユーザーLAN/WAN/VLAN構成は変更せず、カーネル・FWビルド、RAM起動、実機書込みなし。**G1/G2未完、G3 FAIL**。

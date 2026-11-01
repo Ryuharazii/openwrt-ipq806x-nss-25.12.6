@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Isolated WG2600HP NSS physical IF source contract audit, no building.
+
+Fetch the exact qca-nss-drv and qca-nss-gmac package pins, apply the
+repository's package patches, and log driver IF mapping source evidence.
+This is never a claim about QCA NSS firmware parsing or actual boot.
+"""
+from pathlib import Path
+import json
+import re
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCES = (
+    ("drv", "qca-nss-drv", "https://git.codelinaro.org/clo/qsdk/oss/lklm/nss-drv.git", "3cfb9f43"),
+    ("gmac", "qca-nss-gmac", "https://git.codelinaro.org/clo/qsdk/oss/lklm/nss-gmac.git",
+     "171767947467662f2407d0cfff26dfb136c3fb4a"),
+)
+SYMBOLS = {
+    "drv": ("nss_cmn_get_interface_number_by_dev", "subsys_dp_register", "nss_data_plane_register",
+            "nss_gmac_get_netdev_by_macid", "NSS_DRV_VLAN_ENABLE"),
+    "gmac": ("nss_gmac_get_netdev_by_macid", "nss_gmac_probe", "subsys_dp_register"),
+}
+
+def run_command(args, timeout=85, cwd=None):
+    try:
+        return subprocess.run(args, cwd=cwd, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired as e:
+        return type("Timeout", (), {"returncode": 124, "stdout": f"timeout: {e}"})()
+
+def emit(s):
+    print(s, flush=True)
+
+def package_pin(name, url, pin):
+    lines = (ROOT / "package/qca-nss" / name / "Makefile").read_text().splitlines()
+    actual = dict((m.group(1), m.group(2)) for line in lines
+                  if (m := re.match(r"^(PKG_SOURCE_URL|PKG_SOURCE_VERSION):=(.+)$", line)))
+    if actual != {"PKG_SOURCE_URL": url, "PKG_SOURCE_VERSION": pin}:
+        raise RuntimeError(f"PACKAGE_PIN=FAIL {name}: {actual}")
+    emit(f"PACKAGE_PIN=VERIFIED {name} {pin}")
+
+def resolve_full_commit(url, prefix):
+    if len(prefix) == 40:
+        return prefix
+    # GitLab API resolves an abbreviated SHA without guessing a branch tip.
+    project = url.removesuffix(".git").split("git.codelinaro.org/", 1)[-1]
+    path = urllib.parse.quote(project, safe="")
+    target = ("https://git.codelinaro.org/api/v4/projects/" + path +
+              "/repository/commits/" + urllib.parse.quote(prefix, safe=""))
+    try:
+        req = urllib.request.Request(target, headers={"User-Agent": "WG2600HP-pinned-audit"})
+        with urllib.request.urlopen(req, timeout=25) as response:
+            result = json.loads(response.read().decode())
+        full = result.get("id", "")
+        if len(full) == 40 and full.startswith(prefix):
+            emit(f"PIN_RESOLVE=PASS {prefix} {full}")
+            return full
+        emit(f"PIN_RESOLVE=BLOCKED {prefix} unexpected commit response")
+    except Exception as e:
+        emit(f"PIN_RESOLVE=BLOCKED {prefix} {type(e).__name__}: {e}")
+    return None
+
+def fetch_source(where, remote, pin):
+    where.mkdir()
+    run_command(["git", "init", "-q", str(where)])
+    run_command(["git", "-C", str(where), "remote", "add", "origin", remote])
+    # Exact full ID is used whenever available. A short fetch is only a
+    # fallback; resulting SHA must still verify the source pin prefix.
+    resolved = resolve_full_commit(remote, pin)
+    targets = [resolved] if resolved else []
+    if pin not in targets:
+        targets.append(pin)
+    for target in targets:
+        p = run_command(["git", "-C", str(where), "-c", "http.lowSpeedLimit=100",
+                         "-c", "http.lowSpeedTime=15", "fetch", "--no-tags",
+                         "--depth=1", "origin", target], timeout=95)
+        if p.returncode == 0:
+            q = run_command(["git", "-C", str(where), "-c", "advice.detachedHead=false",
+                             "checkout", "-q", "--detach", "FETCH_HEAD"])
+            if q.returncode:
+                emit(f"PIN_FETCH=FAIL checkout {q.stdout[-400:]}")
+                return False
+            actual = run_command(["git", "-C", str(where), "rev-parse", "HEAD"]).stdout.strip()
+            if len(actual) != 40 or not actual.startswith(pin):
+                emit(f"PIN_FETCH=FAIL wrong commit actual={actual} pin={pin}")
+                return False
+            emit(f"PIN_SOURCE=VERIFIED {where.name} commit={actual}")
+            return True
+        emit(f"PIN_FETCH_ATTEMPT=BLOCKED {where.name} {target} {p.stdout[-350:]}")
+    return False
+
+def apply_package_patches(where, package):
+    patchdir = ROOT / "package/qca-nss" / package / "patches"
+    patches = sorted(patchdir.glob("*.patch"))
+    if not patches:
+        emit(f"PIN_PATCH_CHAIN=FAIL missing {package}")
+        return False
+    for p in patches:
+        a = run_command(["patch", "-d", str(where), "-p1", "-f", "--batch",
+                         "--forward", "--fuzz=0", "--input", str(p)])
+        if a.returncode:
+            emit(f"PIN_PATCH_CHAIN=FAIL {package} {p.name} {a.stdout[-1600:]}")
+            return False
+        emit(f"PIN_PATCH=PASS {package}/{p.name}")
+    emit(f"PIN_PATCH_CHAIN=PASS {package} count={len(patches)}")
+    return True
+
+def print_evidence(src, category):
+    # Limit evidence to distinctive source lines. Paths and line numbers are
+    # from the *verified* checkout, not a public-mirror approximation.
+    for sym in SYMBOLS[category]:
+        matches = []
+        for f in sorted(src.rglob("*")):
+            if not f.is_file() or f.suffix not in (".c", ".h"):
+                continue
+            if f.stat().st_size > 4_000_000:
+                continue
+            try:
+                lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            for number, line in enumerate(lines, 1):
+                if sym not in line:
+                    continue
+                if "nss_cmn_get_interface_number_by_dev" in sym and f.name != "nss_cmn.c":
+                    continue
+                if sym == "nss_gmac_get_netdev_by_macid" and category == "gmac" and f.suffix != ".c":
+                    continue
+                matches.append(f"{f.relative_to(src)}:{number}:{line.strip()[:190]}")
+                if len(matches) >= 8:
+                    break
+            if len(matches) >= 8:
+                break
+        emit(f"PIN_SOURCE_SYMBOL={category}/{sym} matches={len(matches)}")
+        for m in matches[:8]:
+            emit("PIN_SOURCE_LINE " + m)
+    if category == "drv":
+        for base in ("nss_cmn.c", "nss_data_plane.c"):
+            files = sorted(src.rglob(base))
+            if not files:
+                emit(f"PIN_MAPPING_FILE=MISSING {base}")
+                continue
+            lines = files[0].read_text(encoding="utf-8", errors="replace").splitlines()
+            for i, line in enumerate(lines):
+                if any(token in line for token in (
+                    "nss_cmn_get_interface_number_by_dev(",
+                    "subsys_dp_register[", "nss_gmac_get_netdev_by_macid(")):
+                    lo, hi = max(0, i-2), min(len(lines), i+7)
+                    emit(f"PIN_IF_MAPPING_CONTEXT {base}:{i+1}")
+                    for n in range(lo, hi):
+                        emit(f"PIN_IF_MAPPING_LINE {n+1}: {lines[n][:190]}")
+                    # Output up to the first 4 fragments per file.
+                    break
+
+def main():
+    drv_cfg = (ROOT / "package/qca-nss/qca-nss-drv/Config.in").read_text()
+    wg_cfg = (ROOT / "diff-wg2600hp-nss").read_text()
+    vlan_disabled = "#config NSS_DRV_VLAN_ENABLE" in drv_cfg and (
+        "CONFIG_NSS_DRV_VLAN_ENABLE=y" not in wg_cfg)
+    emit(f"CONFIG_NSS_DRV_VLAN_EXPOSED={'NO' if vlan_disabled else 'REVIEW'}")
+    if not vlan_disabled:
+        emit("NSS_VLAN_CONFIG=REVIEW unsupported assumption")
+        return 12
+    with tempfile.TemporaryDirectory(prefix="wg2600hp-pin-nss-") as tmp:
+        for key, package, url, pin in SOURCES:
+            package_pin(package, url, pin)
+            path = Path(tmp) / key
+            if not fetch_source(path, url, pin):
+                emit(f"PIN_SOURCE_AUDIT=BLOCKED {package}")
+                return 20
+            if not apply_package_patches(path, package):
+                emit(f"PIN_SOURCE_AUDIT=FAIL {package} patch chain")
+                return 21
+            print_evidence(path, key)
+    emit("PIN_SOURCE_AUDIT=PASS exact pinned source + package patches inspected")
+    emit("PIN_SOURCE_SCOPE=SOURCE_ONLY NO_FW_PARSER_PROOF NO_ARM_BUILD NO_BOOT NO_NSS_CREATE_ACK")
+    return 0
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as error:
+        emit(f"PIN_SOURCE_AUDIT=FAIL {type(error).__name__}: {error}")
+        sys.exit(22)
