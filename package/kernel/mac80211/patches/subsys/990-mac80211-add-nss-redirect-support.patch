@@ -108,7 +108,7 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  	ieee80211_do_stop(sdata, true);
  
  	return 0;
-@@ -1280,6 +1294,38 @@ void ieee80211_del_virtual_monitor(struc
+@@ -1280,6 +1294,43 @@ void ieee80211_del_virtual_monitor(struc
  	kfree(sdata);
  }
  
@@ -123,17 +123,22 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
 +	struct ieee80211_sub_if_data *sdata;
 +
 +	if (!dev) {
-+		kfree(sk_buff);
++		dev_kfree_skb_any(sk_buff);
 +		return;
 +	}
 +
 +	netdev = (struct net_device *)dev;
 +	sdata = netdev_priv(netdev);
 +	if (sdata->dev != dev) {
-+		kfree(sk_buff);
++		dev_kfree_skb_any(sk_buff);
 +		return;
 +	}
 +	skb = (struct sk_buff *)sk_buff;
++	/* eth_type_trans() needs a complete linear Ethernet header. */
++	if (unlikely(!pskb_may_pull(skb, ETH_HLEN))) {
++		dev_kfree_skb_any(skb);
++		return;
++	}
 +	skb->dev = netdev;
 +	skb->protocol = eth_type_trans(skb, netdev);
 +	/* NSS may deliver an exception without a NAPI context. */
@@ -147,7 +152,7 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  /*
   * NOTE: Be very careful when changing this function, it must NOT return
   * an error on interface type changes that have been pre-checked, so most
-@@ -1504,6 +1550,19 @@ int ieee80211_do_open(struct wireless_de
+@@ -1504,6 +1555,19 @@ int ieee80211_do_open(struct wireless_de
  
  	ieee80211_recalc_ps(local);
  
