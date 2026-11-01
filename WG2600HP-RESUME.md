@@ -87,3 +87,12 @@
 - `760-08-net-dsa-8021q-prefix-unwind-6.12-CANDIDATE.patch`（commit `42771824`）: tag_8021q登録途中失敗で成功済みのポートのみ逆順解放し、RX VLANフィルター登録エラーを確認。元Linux v6.12.112→760-03→760-06→760-08の**メモリ上差分再適用一致**。簡易モデル6件一致。**実カーネル未実行**。
 - `760-09-net-dsa-qca8k-bridge-join-unwind-6.12-CANDIDATE.patch`（commit `bee214fa`）: DSA bridge JOIN通知失敗時のQCA8337ポートmembership復元を試行。元Linux→711-01→760-02→760-09の**メモリ上差分再適用一致**。MDIO再失敗時には残留リスク。
 - **次はこれらの局所結果を全経路PASSと誤認しない**。`dsa_switch_tag_8021q_vlan_add` 複数ポート途中失敗の部分復旧、bridge joinのstandalone VLAN削除エラー、CPU0/6 WAN/LAN分離、ECM pinned 760-04/05、NSS実機を横断評価。現状 **G1/G2未確認、G3 FAIL。新ビルド/実機書込み禁止**。
+
+## 2026-11-01 VLAN要求に関する最優先制約と横断確認
+
+- **ユーザーが繰り返し指定した制約**: VLANの追加を求めない。LAN/WAN既存設定を維持する。「はい」で継続するときに同じ条件を聞き直さない。直近の760-08/09を含む8021Q/DSA候補は隔離保留で、本統合・ビルド・書込みを行わない。単なる局所修正PASSを全起動・NSS高速化PASSと表現しない。
+- **実際に照合した基本経路**: Linux v6.12.112 `drivers/net/dsa/qca/qca8k-8xxx.c` の `qca8k_get_tag_protocol()` は標準 `DSA_TAG_PROTO_QCA` を返す。`drivers/net/dsa/qca/qca8k-common.c` の `qca8k_update_port_member()` は `QCA8K_PORT_LOOKUP_CTRL` のポートmembershipを操作し、ブリッジjoin/leaveに使われる。つまりswitchのポート間到達可否制御はユーザー用VLANを新設せず検討できる。ただし**NSSパケット解析対応は別の課題**。
+- **現状の確定した阻害**: 旧RAM版の `lan1 / br-lan / wan` のAE IF番号が-1、ECM `FAIL_RULE=-2`、NSS IPv4 CREATE要求0。原因候補を見ずにAE番号をGMACに直接書き換えるのは不可。NSSがQCAヘッダを解析できると未検証のまま決めつけない。
+- **外部事例は別機種**: IPQ5018/QCA8337向けの公開実装 `kuncy7/openwrt-nss-edma/README.ipq50xx.md` は、NSSによるQCA 2バイトヘッダの解釈困難を指摘。ただしWG2600HP/IPQ8064での実証ではない。現機種向けのデータパスをクロス確認する必要がある。
+- **ECM候補の適用順の事実確認**: 実packageパッチ名は `400-kernel-6.12-support.patch` と `401-kernel-6.12-drop-sysctl-sentinels.patch`。隔離 `760-04/05` は未統合・未コンパイル、正しいNSS IF・WAN/LAN分離未実証。標準ECM variantのMakefileには `ECM_INTERFACE_VLAN_ENABLE=y` があるが、それをユーザー設定へのVLAN追加根拠にしてはならない。
+- **次の順序**: 既存のQCA8337二CPUポート＋GMAC eth0/eth1＋タグ無し運用可否を、旧実機通信経路、NSS FWのヘッダ受理、ECM IF解決、LAN/WAN分離と照合。切替に伴うDSA解除/復旧、PHY、起動順も確認。根拠が不足する間 G1/G2未確認・G3 FAIL、仮想フルブート未実施、ARMビルド・実機書込みなし。
