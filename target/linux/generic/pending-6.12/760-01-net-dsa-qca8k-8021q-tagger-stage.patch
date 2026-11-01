@@ -11,24 +11,20 @@ Reference: Stanislaw Pal's 6.18 implementation (2026-09-11).
 ---
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
-@@ -53,7 +53,8 @@
- #define DSA_TAG_PROTO_RTL8_4T_VALUE		25
+@@ -54,5 +54,6 @@
  #define DSA_TAG_PROTO_RZN1_A5PSW_VALUE		26
  #define DSA_TAG_PROTO_LAN937X_VALUE		27
  #define DSA_TAG_PROTO_VSC73XX_8021Q_VALUE	28
 +#define DSA_TAG_PROTO_QCA_8021Q_VALUE		29
  
  enum dsa_tag_protocol {
- 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
-@@ -84,7 +85,8 @@
- 	DSA_TAG_PROTO_RTL8_4T		= DSA_TAG_PROTO_RTL8_4T_VALUE,
+@@ -85,5 +86,6 @@
  	DSA_TAG_PROTO_RZN1_A5PSW	= DSA_TAG_PROTO_RZN1_A5PSW_VALUE,
  	DSA_TAG_PROTO_LAN937X		= DSA_TAG_PROTO_LAN937X_VALUE,
  	DSA_TAG_PROTO_VSC73XX_8021Q	= DSA_TAG_PROTO_VSC73XX_8021Q_VALUE,
 +	DSA_TAG_PROTO_QCA_8021Q		= DSA_TAG_PROTO_QCA_8021Q_VALUE,
  };
  
- struct dsa_switch;
 --- a/net/dsa/Kconfig
 +++ b/net/dsa/Kconfig
 @@ -125,7 +125,13 @@
@@ -47,15 +43,13 @@ Reference: Stanislaw Pal's 6.18 implementation (2026-09-11).
  	  Say Y or M if you want to enable support for tagging frames for the
 --- a/net/dsa/Makefile
 +++ b/net/dsa/Makefile
-@@ -31,7 +31,8 @@
- obj-$(CONFIG_NET_DSA_TAG_NONE) += tag_none.o
+@@ -32,5 +32,6 @@
  obj-$(CONFIG_NET_DSA_TAG_OCELOT) += tag_ocelot.o
  obj-$(CONFIG_NET_DSA_TAG_OCELOT_8021Q) += tag_ocelot_8021q.o
  obj-$(CONFIG_NET_DSA_TAG_QCA) += tag_qca.o
 +obj-$(CONFIG_NET_DSA_TAG_QCA_8021Q) += tag_qca_8021q.o
  obj-$(CONFIG_NET_DSA_TAG_RTL4_A) += tag_rtl4_a.o
  obj-$(CONFIG_NET_DSA_TAG_RTL8_4) += tag_rtl8_4.o
- obj-$(CONFIG_NET_DSA_TAG_RZN1_A5PSW) += tag_rzn1_a5psw.o
 --- /dev/null
 +++ b/net/dsa/tag_qca_8021q.c
 @@ -0,0 +1,177 @@

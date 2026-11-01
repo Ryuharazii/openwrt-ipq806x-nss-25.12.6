@@ -449,3 +449,8 @@
 - 同ジョブで`760-01`を**711/712適用前の素のLinux6.12.112に対してdry-run**しても`DSA_76001_STOCK_DRY_RUN=FAIL`、`include/net/dsa.h`2ハンクと`net/dsa/Makefile`1ハンクを拒否。711-01/02/03・712の4本は再びPASS、その後の`760-01`も同じ3ハンクで失敗。
 - CIで直前の`include/net/dsa.h` git blob=`a1f730d9f01b82f7f04ca365d1a6b22a96bd3521`、`net/dsa/Makefile`=`555c07cfeb71285b1904bb5ffa0ec8702c1267f8`（元ソースそのもの、上流から変化なし）を確認。`760-01`の各旧ハンク7行を文字列として直接比較した結果、**3ハンクとも `exact_source_match=True`**。すなわち単に「上流コードに旧テキストが無い」とは説明できない。GNU patchのハンク認識・周辺文脈・patchファイルの整合性を次に検査し、根拠が揃うまで見かけの文脈修正をしない。
 - この結果は**現CIの選択12パッチゲートFAIL**を意味し、全OpenWrt patch適用後の合否、カーネル起動、実機通信への帰結は未確認。修正版760は本統合しない。通常作業ブランチと既存LAN/WAN/VLAN設定は不変更。**G1/G2未完、G3 FAIL、ファームビルド・書込み禁止**。
+
+## 2026-11-01 第23セッション：760-01 GNU patch strict-contextの隔離再生成試験
+
+- 前回 `760-01` の同じ公式Linux 6.12.112実ソースに対し`git apply --check` PASS、GNU`patch --fuzz=0` FAILを再現。GitHub Actions [#41274019930](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274019930)：GNU`--ignore-whitespace` PASS、既定fuzz PASS、`--posix` FAIL。3個の追加のみのハンクで前後文脈1行を端から縮めることで、**--fuzz=0を保ったまま**適用可能か、隔離候補で実証する。単に`--ignore-whitespace`やfuzz=1を本番ゲートに許容して通過扱いにしない。
+- 更新は隔離ブランチの`target/linux/generic/pending-6.12/760-01-...`の差分文脈3ハンクだけ、変更行は`#define`、enumエントリ、Makefile行で従来と同じ。旧/新行数の自動一致検査PASS。本結果はCI実行前にPASSとしない。既存711/712・後続760-02/03/06/08/09/10/11の整合性とARM/実機は未確認。**G3 FAIL、新FWビルド・書き込み禁止**。
