@@ -1,6 +1,13 @@
 #!/bin/sh
-# WG2600HP end-to-end read-only boot/network audit.
+# WG2600HP read-only network inventory; NSS acceleration is a separate gate.
 # Run as root after RAM boot: wg2600hp-net-audit
+# No arguments: fail closed (exit 3) when only inventory is available.
+# --inventory-only: check basic device and probe inventory only (exit 0/1).
+case "${1:-}" in
+    "") inventory_only=0 ;;
+    --inventory-only) inventory_only=1 ;;
+    *) echo 'Usage: wg2600hp-net-audit [--inventory-only]' >&2; exit 2 ;;
+esac
 # No interface changes, persistent writes, firmware flashing, or packet sends.
 
 board=$(cat /tmp/sysinfo/board_name 2>/dev/null)
@@ -34,6 +41,10 @@ fi
 
 echo '--- 3. Full interface state ---'
 ip -br link
+echo '--- 3a. DSA runtime conduit details (diagnostic; not PASS) ---'
+for dev in wan lan1 lan2 lan3 lan4; do
+    ip -d link show dev "$dev" 2>&1 || :
+done
 echo '--- 4. IPv4 addresses ---'
 ip -4 -br addr
 echo '--- 5. IPv4 routing table ---'
@@ -62,9 +73,23 @@ else
     echo 'WARN TUNIPIP6 debug stats absent (acceleration not proven)'
 fi
 
+echo '--- 9. NSS IPv4 counters (snapshot only) ---'
+if [ -r /sys/kernel/debug/qca-nss-drv/stats/ipv4 ]; then
+    grep -E 'rx_packets|tx_packets|create_requests|create_responses|eth_rx_unknown_l3_protocol' \
+        /sys/kernel/debug/qca-nss-drv/stats/ipv4 || :
+else
+    echo 'WARN NSS IPv4 stats not readable'
+fi
 printf 'SUMMARY device_missing=%s\n' "$missing"
-echo 'NOTE: device presence is not proof of IPv4 forwarding, NSS offload or IPIP6 acceleration.'
+echo 'NOTE: this script does not prove IPv4 forwarding, NSS offload or IPIP6 acceleration.'
 if [ "$missing" -ne 0 ] || [ -n "$errors" ]; then
+    echo 'RESULT=INVENTORY_FAIL NSS_OFFLOAD=UNVERIFIED'
     exit 1
 fi
-exit 0
+if [ "$inventory_only" -eq 1 ]; then
+    echo 'RESULT=INVENTORY_ONLY NSS_OFFLOAD=UNVERIFIED'
+    exit 0
+fi
+echo 'RESULT=INCOMPLETE NSS_OFFLOAD=UNVERIFIED'
+echo 'EXIT=3: Hardware offload requires live traffic, ECM rule/ACK and NSS counter deltas.'
+exit 3
