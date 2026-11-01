@@ -54,5 +54,18 @@ for token in NSS_IPV4_RULE_CREATE_VLAN_VALID vlan_primary_rule vlan_secondary_ru
     printf '%s\n' "$matches"
   fi
 done
+# Strict source-level evidence: both IPv4 frontends must populate tagged
+# CREATE rules. This verifies source relationships, not NSS firmware behavior.
+for frontend in ecm_nss_ported_ipv4.c ecm_nss_non_ported_ipv4.c; do
+  file="$src/frontends/nss/$frontend"
+  for token in NSS_IPV4_RULE_CREATE_VLAN_VALID vlan_primary_rule.ingress_vlan_tag vlan_primary_rule.egress_vlan_tag; do
+    if ! grep -Fq "$token" "$file"; then
+      echo "ECM_IPV4_VLAN_FRONTEND=FAIL $frontend token=$token"
+      exit 22
+    fi
+  done
+  echo "ECM_IPV4_VLAN_FRONTEND=PASS $frontend create-valid-flag+ingress+egress source fields"
+done
+echo "ECM_IPV4_RULE_SCOPE=ABI_ONLY NOT_NSS_FW_SUPPORTED NOT_NSS_CREATE_ACK"
 echo "ECM_STAGED_APPLY=PASS exact source + OpenWrt patch order + staged 760-04/05"
 echo "ECM_SCOPE=SOURCE_APPLY_ONLY NO_ARM_BUILD NO_BOOT NO_NSS_ACK"
