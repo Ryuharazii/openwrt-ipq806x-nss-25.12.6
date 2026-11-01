@@ -211,8 +211,8 @@ class CrossAuditTest(unittest.TestCase):
     def test_detects_wrong_dsa_cpu_port_mode(self):
         self.mutate(
             "target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts",
-            'ethernet = <&gmac1>;\n\t\t\t\tphy-mode = "rgmii";',
-            'ethernet = <&gmac1>;\n\t\t\t\tphy-mode = "sgmii";',
+            'dsa-tag-protocol = "qca-8021q";\n\t\t\t\tphy-mode = "rgmii";',
+            'dsa-tag-protocol = "qca-8021q";\n\t\t\t\tphy-mode = "sgmii";',
         )
         result = self.run_audit()
         self.assertNotEqual(result.returncode, 0)
