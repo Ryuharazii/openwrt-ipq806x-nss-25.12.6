@@ -1,7 +1,19 @@
-name: Build WG2600HP NSS 25.12.6
+name: Build WG2600HP NSS 25.12.6 — isolated firmware candidate
 
-# Manual builds only: avoid unnecessary 6-hour GitHub runner jobs on each commit.
+# The user requested an actual WG2600HP firmware, not repeated source audits.
+# This branch is isolated, and push builds run only when build inputs change.
 on:
+  push:
+    branches: [wg2600hp-nss-integrated-candidate-20261101]
+    paths:
+      - '.github/workflows/build-wg2600hp-nss.yml'
+      - 'target/**'
+      - 'package/**'
+      - 'diff-wg2600hp-nss'
+      - 'VHTNSS.zip'
+      - 'scripts/wg2600hp_nss_image_gate.sh'
+      - 'scripts/wg2600hp_verify_embedded_dtb.py'
+      - 'scripts/wg2600hp_verify_wifi_nss_binary.py'
   workflow_dispatch:
 
 concurrency:
@@ -78,15 +90,6 @@ jobs:
           done
           cp .config wg2600hp-resolved.config
 
-      - name: Cross-component static preflight
-        run: |
-          sh -n target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit
-          test "$(git ls-files --stage target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit | awk '{print $1}')" = 100755
-          python3 -m py_compile scripts/wg2600hp_cross_audit.py scripts/wg2600hp_verify_embedded_dtb.py
-          python3 scripts/wg2600hp_cross_audit.py
-          python3 -m unittest discover -s tests -p 'test_wg2600hp_cross_audit.py' -v
-          python3 -m unittest discover -s tests -p 'test_wg2600hp_wifi_nss_binary.py' -v
-
       - name: Download source archives
         run: make -j8 download
 
@@ -127,8 +130,11 @@ jobs:
           echo "Toolchain cache hit: ${{ steps.toolchain-cache.outputs.cache-hit }}"
           du -sh dl feeds staging_dir/host staging_dir/toolchain-* .ccache 2>/dev/null || true
 
-      - name: Build firmware
-        run: make -j$(nproc)
+      - name: Build actual WG2600HP initramfs and sysupgrade firmware
+        run: |
+          echo "FIRMWARE_BUILD=START isolated candidate; not approved for flash"
+          make -j$(nproc)
+          echo "FIRMWARE_BUILD=COMPLETED kernel/packages/images"
 
       # Save compiler outputs even when the firmware fails to compile.
       - name: Compiler cache statistics
@@ -157,9 +163,10 @@ jobs:
           cp bin/targets/ipq806x/generic/*.manifest out/ || true
           (cd out && sha256sum * > SHA256SUMS)
           ls -lh out
+          echo "FIRMWARE_OUTPUT=GENERATED_PENDING_HARDWARE_VALIDATION"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: WG2600HP-IPQ8064-25.12.6-NSS
+          name: WG2600HP-IPQ8064-25.12.6-NSS-ISOLATED-CANDIDATE
           path: out/
           retention-days: 30

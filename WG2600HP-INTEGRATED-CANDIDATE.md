@@ -62,3 +62,19 @@ must be taken from CI logs; no assumption of PASS.
 ## ECM ARM compilation evidence — 2026-11-01
 
 [GitHub Actions #41281477729](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41281477729): two exact pinned NSS-enabled ECM C objects compiled to ARM successfully after fixing duplicate 760-04/05 application and faithfully preparing generated NSS driver arch/version includes. This is **not** full module link, firmware build, or hardware NSS offload proof. G1/G2 incomplete, G3 FAIL.
+
+## 2026-11-01 — actual firmware compilation execution
+
+The user explicitly prioritized delivering a WG2600HP/IPQ8064 OpenWrt25.12.6
+NSS firmware over repeating source-only checks. The existing production-like
+manual `build-wg2600hp-nss.yml` pipeline is enabled **for pushes changing
+build inputs on this isolated candidate branch only**. It runs OpenWrt feeds,
+resolved WG2600HP config, real source download, host tools/toolchain, full
+`make`, final WG2600HP image gate and uploads initramfs/sysupgrade plus
+manifest/config/checksums. Previously repeated static preflight was removed,
+while real image validation remains.
+
+This is a **build candidate, not a release or proof of NSS acceleration**.
+The ordinary branch and running device remain untouched. G1/G2 hardware
+conditions remain incomplete; G3 release/flash eligibility FAIL. Do not
+describe an initiated run as an image until artifacts actually exist.
