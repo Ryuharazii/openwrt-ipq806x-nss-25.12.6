@@ -588,3 +588,9 @@
 - **検査スクリプトの実欠陥修正**：ECM active packageの`760-04/05`をstagingからさらに再適用する二重処理を修正。activeとstageの同一性確認の上で、`package/qca-nss/qca-nss-ecm/patches`全11パッチを**各1回のみ**適用。検証用のARMクロス環境へNSS driver exact pin `3cfb9f43536e77ae05a141cce18a242b85e834ab`とOpenWrt Build/Configureによる`nss_arch.h`を再現。ECM標準構成のコンパイラフラグ・PCC無効・NETFILTER/NF_CONNTRACK/QCA8021Q有効化を反映。
 - **新たな実コンパイル証拠**：`ECM_ARM_OBJECT=PASS ecm_interface.o`、`ECM_ARM_OBJECT=PASS frontends/nss/ecm_nss_ported_ipv4.o`、`ECM_ARM_BUILD=PASS pinned ECM objects for ARM`。Linux6.12.112のOpenWrt594パッチ実適用とソースpin `9acdcb05...`＋11ECMパッチを実際に使用した。古い診断runのFAILはテスト環境の不備（短縮pin、生成ヘッダー、警告フラグ、PCC・NF選択）であり、以前のソース未整合と誤認しない。
 - **限界**：外部ECMモジュール全体のリンク/`modpost`、NSS/GMACの`Module.symvers`、ECM IPv4 `AE IF=-1`の実機修正、NSS IPv4 CREATE/ACKやタグ処理、Wi-Fi/IPIP6、RAM起動はまだ未検証。**G1/G2未完／G3 FAIL**、ファーム新規ビルド／書込みなし。DSA既存4件コンパイル・故障8ケースの重複実行なし、通常ブランチ未変更。
+
+## 2026-11-01 固定IPIP6トンネル解放時の実装修正（現セッション）
+
+- 変更コミット `f9d4e00a18d4b2cdc013b16fcb9bc353e4f689c0`、対象 `package/qca-nss/qca-nss-clients/patches/140-wg2600hp-tunipip6-lifecycle-atomic-free.patch`。既存のNETDEV_DOWNと一括削除における `debugfs_remove(dentry)` を `vfree(ntii)` より前へ移動。いずれもspinlock解放後。debugfs利用中の解放済みcontext参照を避けることが目的。
+- GitHub読戻しで変更SHA `6e006b362e4e0063b35f606338ff938b7c7fcdc7`、unified-diff 4ハンクの旧/新行数整合4/4を確認。実ソースへの適用・コンパイル・実機RAM起動は未実施のため**G2/G3をPASSとしない**。
+- ユーザーがキャンセルした `.github/workflows/build-wg2600hp-nss.yml`（空ファイル）を上書きせず、フルビルド・フラッシュを自動起動しない。新ファーム・有線IPv4/Wi-Fi/IPIP6 NSS高速化の実機証拠は未取得。
