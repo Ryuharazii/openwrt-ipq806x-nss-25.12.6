@@ -602,3 +602,10 @@
 - 437237ed1ffa4bdfe9fddcd948b6a9193a5f9bc3: 141パッチをactive qca-nss-clientsへ追加。INNER/OUTER の NSS unregister を dynamic IF dealloc より前へ移動。dealloc ACK は dynamic IF のtypeをNONEにするが unregister API は有効なtypeを要求するため。
 - 検査範囲: GitHub再取得で140処理順と141の2パッチハンク行数を確認。実ソースパッチ適用・ARMモジュールビルド・RAM起動・固定IPIP6 FW ACKは未確認。
 - 残留: dealloc NACK時の復旧設計、全経路回帰、有線IPv4/無線/固定IPIP6実機高速化。G1/G2未完、G3 FAIL。ビルドなし。
+
+## 2026-11-01 訂正：141パッチを撤回（既存135と競合）
+
+- **撤回commit a59996d630f93bab51d87bdfbb892b1eae936b0c**: `qca-nss-clients/patches/141-wg2600hp-tunipip6-unregister-before-dealloc.patch` をactive build inputから削除。
+- 既存の `qca-nss-drv/patches/135-tunipip6-deallocation-unregister-check.patch` は `nss_unregister_tunipip6_if` の検証を dynamic IF type依存から `nss_is_dynamic_interface(if_num)` の範囲検査へ修正済み。そのため、clients側は元の `dealloc ACK -> unregister` の順序で既存driverと整合。
+- 141は重複対策であり、dealloc NACK/timeout時に先に登録解除すると動作中NSS IFのホスト登録が消える危険がある。前セッションの『修正2件』という評価は訂正。140のnetdev参照保持改修は維持。
+- **実ファームの生成・ARMビルド・RAM起動・有線IPv4/Wi-Fi/IPIP6のNSS速度実証は未実施。G1/G2未完・G3 FAIL。新CIビルドは起動しない。**
