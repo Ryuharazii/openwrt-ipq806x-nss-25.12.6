@@ -410,3 +410,9 @@
 - **隔離候補だけをfail-closed修正**：`760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch` の helper で bridge device 取得失敗か `br_vlan_enabled(br)` の場合に `NULL` を返してDSAを仮想VLANとして扱わない。Linux `linux/if_bridge.h` を明示追加。既存VLAN-unaware bridge/standalone/WAN・LAN構成とQCA通常運用を変更しない。VLAN-awareのNSS加速を**許可する修正ではなく禁止する安全策**。
 - host-only 回帰：`tests/test_wg2600hp_ecm_8021q_guard.py` はガード順序、bridge取得、tagger実VID、CPU0/6分離を検査し、guardを除外する負例2件が不合格になるか確認。`.github/workflows/test-wg2600hp-staged-qca8021q.yml` のホスト試験に追加。unified-diffの7ハンク旧/新行数一致をGitHub保存前に確認。**CIジョブログ確認前にPASSとはしない**。
 - 未完：pinned ECM実ソース+OpenWrt400/401適用後へのdry-run/ARM compile、実DSA/FDB/PVID VLAN HW、IPv4 NSS CREATE/ACKとタグ処理、Boot ROM→U-Bootのログ、Wi-Fi、固定IPIP6の全回帰。公開 `0052` をIPQ8064へ移植したわけではない。**G1/G2未完了、G3 FAIL、新規FWビルド・書込み禁止**。
+
+## 2026-11-01 第22セッション：隔離 CI 実行証拠（修正版760-04）
+
+- 対象コミット `ef7663b56bbf34123164bf6cf81ccd5ad2d7b756`、機種 WG2600HP/IPQ8064、GitHub Actions [41272860330](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41272860330) を2026-11-01確認：`completed/success`。同一ジョブ `staging-host-only` の各ステップすべて `success`、ジョブログから `HOST_SOURCE_SYNC=PASS`、DSAタグ模擬 `12 PASS/0 FAIL`、旧760-10負例 `FAIL VLAN-aware routed`（期待通り）、ネット診断8テスト `OK`、ECM新ガード6テスト `OK` を確認。
+- **PASSの範囲**：GitHub host runner のソース文字列整合、C模擬動作、Python unittestのガード検出。760-04の実pinned ECM適用・Linux6.12 ARMコンパイル、DSA/FDB/VTU、NSS firmware CREATE/ACK、RAM実機IPv4、Wi-Fi、固定IPIP6の検証ではない。
+- G1：起動全経路未完、G2：修正版の実後続回帰未完、**G3 FAIL・ARMファームビルド禁止**。診断・隔離候補以外の通常作業ブランチ、WAN/LAN設定、ユーザー用VLANに変更なし。
