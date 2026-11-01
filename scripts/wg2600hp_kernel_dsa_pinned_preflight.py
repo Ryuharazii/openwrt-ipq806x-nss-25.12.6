@@ -60,6 +60,16 @@ def run():
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(data)
             print(f"DSA_SOURCE=VERIFIED {name} git_blob={actual}", flush=True)
+        # Diagnostic only: check if staged 760-01 applies on untouched upstream.
+        stage_one = ROOT / PATCHES[4]
+        dry = subprocess.run(
+            ["patch", "--directory", str(scratch), "-p1", "--batch", "--forward",
+             "--dry-run", "--fuzz=0", "--input", str(stage_one)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False,
+        )
+        print(f"DSA_76001_STOCK_DRY_RUN={'PASS' if dry.returncode == 0 else 'FAIL'}", flush=True)
+        if dry.returncode:
+            print(dry.stdout[-2500:], flush=True)
         for relative in PATCHES:
             patch_file = ROOT / relative
             if not patch_file.is_file():
@@ -73,6 +83,25 @@ def run():
             if result.returncode:
                 print(f"DSA_PATCH=FAIL {relative}", flush=True)
                 print(result.stdout[-6000:], flush=True)
+                if "760-01-" in relative:
+                    for file in ("include/net/dsa.h", "net/dsa/Makefile"):
+                        data = (scratch / file).read_bytes()
+                        print(f"DSA_PRE_76001_BLOB {file} {git_blob_sha(data)}", flush=True)
+                    patch_lines = patch_file.read_text(encoding="utf-8").splitlines()
+                    current = ""
+                    for idx, line in enumerate(patch_lines):
+                        if line.startswith("+++ b/"):
+                            current = line[6:]
+                        if current not in ("include/net/dsa.h", "net/dsa/Makefile") or not line.startswith("@@ "):
+                            continue
+                        old = []
+                        for l in patch_lines[idx + 1:]:
+                            if l.startswith("@@ ") or l.startswith("--- "):
+                                break
+                            if l.startswith(" ") or l.startswith("-"):
+                                old.append(l[1:])
+                        source = (scratch / current).read_text(encoding="utf-8")
+                        print(f"DSA_FAILED_HUNK_CONTEXT {current} {line} exact_source_match={chr(10).join(old) in source}", flush=True)
                 return 21
             print(f"DSA_PATCH=PASS {relative}", flush=True)
         print("DSA_PATCH_CHAIN=PASS 7 verified upstream source files, 12 patch steps", flush=True)

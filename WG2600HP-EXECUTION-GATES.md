@@ -435,3 +435,10 @@
 - 対象WG2600HP/IPQ8064、上流`gregkh/linux`の`v6.12.112`を基準とする。`include/net/dsa.h`、`net/dsa/{Kconfig,Makefile,tag_8021q.c}`、`qca8k.{h}`、`qca8k-{8xxx,common}.c`の**7ソースGit blob SHA**をAPIで実確認。新規`scripts/wg2600hp_kernel_dsa_pinned_preflight.py`が7実ファイルを取得しGit SHA1(blob)で一致確認後、作業ツリーの既存711-01/02/03・712、隔離760-01/02/03/06/08/09/10/11の**12パッチを順番に一時領域で適用**する。欠落、不一致、文脈不整合、ネットワーク取得失敗は即失敗/未確認扱い。
 - 既存の隔離host CIに限定し、実ソースへの`patch -p1 --fuzz=0`試験でありARMファームのビルドではない。結果は新たなGitHub Actions jobログ確認後に判定する。
 - **範囲の限定**：これは上流素のLinuxと選択12パッチのみ。OpenWrtのほかのgeneric pending・ipq806x target patch全体を先に適用した環境、ARMコンパイル、デバイス電源投入、RAM実機、DSA VLANハード、NSS CREATE/ACKの合格を意味しない。通常作業ブランチとWAN/LAN設定・ユーザーVLANを変更しない。G1/G2未完、**G3 FAIL、FWビルド不可**。
+
+## 2026-11-01 第22セッション：DSA 760-01 実適用FAILの検証境界
+
+- 公式 Linux`gregkh/linux v6.12.112` からDSA関連7ファイルを取得しgit blob SHA7/7検証PASS。隔離CI [#41273430821](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41273430821)で既存711-01/02/03・712の4本は`--fuzz=0`で実適用PASS。
+- **FAIL**：次の`760-01`で`include/net/dsa.h`2ハンク・`net/dsa/Makefile`1ハンクが不一致、CI job失敗。Kconfigと新tagger作成だけでは合格しない。旧host static PASSを全ソース適用PASSに使わない。
+- 直接取得した元ソース7ファイルに対して旧ハンク文字列は全件存在するため、無条件パッチ書換えは保留。前段711/712後のブロブ・ハンク一致と760-01単独dry-runの診断を追加し、失敗原因を分離する。Linux全generic patch・target patchを適用したわけではない。
+- G1/G2未完・**G3 FAIL**。通常作業ブランチ/設定は変更なし。ファームビルド・フラッシュなし。
