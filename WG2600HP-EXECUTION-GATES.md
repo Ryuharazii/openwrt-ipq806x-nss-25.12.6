@@ -479,3 +479,9 @@
 - ECM `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa` 固定原本+既存9本+隔離760-04/05の実適用もこのジョブで引き続きPASS。host guard C 12/12、ネット診断unittest 8/8、ECM guard unittest 6/6もPASS。既知旧760-10負例の検出は正常な負試験であり「本版動作FAIL」と混同しない。
 - **境界は厳守**：この選択12本のみで、OpenWrtの`generic/pending-6.12`と`ipq806x/patches-6.12`全件適用後の整合ではない。ARMコードコンパイル・実ビルド、Boot ROM→U-Boot→DSA/GMAC/ECM→NSS経路全起動、RAM実機 IPv4/NSS CREATE-ACK、Wi-Fi、固定IPIP6は未実施。試験成功をハードウェアPASSへ格上げしない。**G1/G2未完了、G3 FAIL、FWビルド・書込み禁止**。
 - 通常作業ブランチやボードLAN/WAN設定・ユーザーVLAN設定の変更なし。次の合格条件は全OpenWrtパッチ適用後のコード整合、NSS FW VLANタグ解釈とIF階層を再検証してからG3へ進むこと。
+
+## 2026-11-01 第24セッション：OpenWrt全カーネルパッチ適用ゲートの導入（結果待ち）
+
+- 作業対象WG2600HP（IPQ8064）、Linux 6.12.112。公式 `include/quilt.mk`および`target/linux/generic/PATCHES.md`を照合し、**backport→pending→hack→ipq806x target** が実際の適用順と確認。`target/linux/generic/kernel-6.12`に`LINUX_KERNEL_HASH-6.12.112=164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`がある。
+- 隔離専用`scripts/wg2600hp_kernel_full_patch_preflight.py`を導入：このhashと一致する公式ソースtarballを一時領域へ取得・SHA256検証・展開、OpenWrt generic/IPQ806xオーバーレイを複写後、上記の公式順で**全patchファイル**を`patch -f -p1`（OpenWrt相当）で適用。拒否時は即FAIL。続いて元のstaging`760-02/03/06/08/09/10/11`を`--fuzz=0`で適用し、先行`760-01`との整合を確認。大量ソースはCI一時領域のみ、本repo通常ブランチに追加せず削除。
+- **CIログ確認までは未検証**。対象はソースのパッチ適用のみであり、Kconfig/ARM/DSA hardware/NSS accelerated packets/IPv4/Wi-Fi/TUNIPIP6の成功ではない。そもそもstaged patchは通常ビルドへ組み込まれていない。G1/G2未完、G3 FAIL、ファームビルド・フラッシュ禁止。

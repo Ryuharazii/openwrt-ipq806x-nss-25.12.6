@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""Host-only full OpenWrt Linux 6.12.112 patch application preflight.
+
+This extracts the sha256-verified upstream kernel to a temporary directory,
+copies base overlays, applies ALL generic backport/pending/hack and ipq806x
+patches in OpenWrt's official order, then applies proposed DSA candidates.
+It does NOT configure, compile, build, boot, or flash firmware.
+"""
+from pathlib import Path
+import hashlib
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import urllib.request
+
+ROOT = Path(__file__).resolve().parent.parent
+VERSION = "6.12.112"
+KERNEL_HASH = "164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03"
+KERNEL_URL = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.112.tar.xz"
+PATCH_DIRS = (
+    "target/linux/generic/backport-6.12",
+    "target/linux/generic/pending-6.12",
+    "target/linux/generic/hack-6.12",
+    "target/linux/ipq806x/patches-6.12",
+)
+OVERLAY_DIRS = (
+    "target/linux/generic/files",
+    "target/linux/generic/files-6.12",
+    "target/linux/ipq806x/files",
+    "target/linux/ipq806x/files-6.12",
+)
+STAGED = (
+    "backports/staging/760-02-net-dsa-qca8k-8021q-driver-6.12-CANDIDATE.patch",
+    "backports/staging/760-03-net-dsa-8021q-dual-cpu-vlan-isolation-6.12.patch",
+    "backports/staging/760-06-net-dsa-8021q-register-error-cleanup-6.12-CANDIDATE.patch",
+    "backports/staging/760-08-net-dsa-8021q-prefix-unwind-6.12-CANDIDATE.patch",
+    "backports/staging/760-09-net-dsa-qca8k-bridge-join-unwind-6.12-CANDIDATE.patch",
+    "backports/staging/760-10-net-dsa-qca8021q-routed-cpu-bridge-vid-6.12-CANDIDATE.patch",
+    "backports/staging/760-11-net-dsa-qca8021q-vlan-aware-vid-guard-6.12-CANDIDATE.patch",
+)
+
+def say(message):
+    print(message, flush=True)
+
+def ensure_pin():
+    p = (ROOT / "target/linux/generic/kernel-6.12").read_text(encoding="utf-8")
+    if f"LINUX_VERSION-6.12 = .112" not in p or f"LINUX_KERNEL_HASH-{VERSION} = {KERNEL_HASH}" not in p:
+        raise ValueError("OpenWrt kernel pin or archive hash changed")
+    readme = (ROOT / "target/linux/generic/PATCHES.md").read_text(encoding="utf-8")
+    expected = ("backport-*/", "pending-*/", "hack-*/")
+    if any(s not in readme for s in expected):
+        raise ValueError("Kernel patch order documentation has changed")
+
+def download_verified(dst):
+    h = hashlib.sha256()
+    n = 0
+    started = time.monotonic()
+    say(f"KERNEL_ARCHIVE_FETCH=START {KERNEL_URL}")
+    try:
+        with urllib.request.urlopen(KERNEL_URL, timeout=40) as response, dst.open("wb") as out:
+            while True:
+                if time.monotonic() - started > 180:
+                    raise TimeoutError("archive download exceeded 180 seconds")
+                part = response.read(1024 * 1024)
+                if not part:
+                    break
+                h.update(part)
+                out.write(part)
+                n += len(part)
+    except Exception as e:
+        say(f"KERNEL_ARCHIVE_FETCH=BLOCKED {e}")
+        return False
+    actual = h.hexdigest()
+    if actual != KERNEL_HASH:
+        say(f"KERNEL_ARCHIVE_HASH=FAIL actual={actual} expected={KERNEL_HASH} size={n}")
+        return False
+    say(f"KERNEL_ARCHIVE_HASH=PASS sha256={actual} bytes={n}")
+    return True
+
+def overlay(linux):
+    for relative in OVERLAY_DIRS:
+        source = ROOT / relative
+        if not source.exists():
+            continue
+        if not source.is_dir():
+            raise ValueError(f"unexpected overlay {relative}")
+        shutil.copytree(source, linux, dirs_exist_ok=True, symlinks=True)
+        say(f"OVERLAY=PASS {relative}")
+
+def ordered_patches(directory):
+    series = directory / "series"
+    if series.exists():
+        names = [s.split("#", 1)[0].strip() for s in series.read_text().splitlines()]
+        names = [x for x in names if x]
+        return [directory / x for x in names]
+    return sorted(directory.glob("*.patch"))
+
+def apply_patch(linux, patchfile, strict):
+    flags = ["patch", "-f", "-p1", "-d", str(linux)]
+    if strict:
+        flags += ["--batch", "--forward", "--fuzz=0"]
+    with patchfile.open("rb") as fd:
+        p = subprocess.run(flags, stdin=fd, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, check=False)
+    msg = p.stdout.decode("utf-8", errors="replace")
+    return p.returncode == 0, msg
+
+def run():
+    try:
+        ensure_pin()
+    except (ValueError, OSError) as e:
+        say(f"OPENWRT_PIN=FAIL {e}")
+        return 12
+    with tempfile.TemporaryDirectory(prefix="wg2600hp-openwrt-kernel-") as tmp:
+        temp = Path(tmp)
+        archive = temp / f"linux-{VERSION}.tar.xz"
+        if not download_verified(archive):
+            return 20
+        try:
+            with tarfile.open(archive, "r:xz") as t:
+                # Archive is the SHA256-verified upstream kernel release.
+                t.extractall(path=temp, filter="data")
+        except Exception as e:
+            say(f"KERNEL_ARCHIVE_EXTRACT=FAIL {e}")
+            return 22
+        linux = temp / f"linux-{VERSION}"
+        if not (linux / "include/net/dsa.h").is_file():
+            say("KERNEL_SOURCE=FAIL upstream source missing")
+            return 22
+        say("KERNEL_SOURCE=VERIFIED extracted complete upstream Linux tree")
+        overlay(linux)
+        total = 0
+        fuzzy = []
+        for dirname in PATCH_DIRS:
+            directory = ROOT / dirname
+            if not directory.is_dir():
+                say(f"OPENWRT_PATCH_DIR=FAIL {dirname} missing")
+                return 23
+            files = ordered_patches(directory)
+            say(f"OPENWRT_PATCH_DIR=BEGIN {dirname} count={len(files)}")
+            for file in files:
+                if not file.is_file():
+                    say(f"OPENWRT_PATCH=FAIL missing {file}")
+                    return 23
+                ok, msg = apply_patch(linux, file, strict=False)
+                if not ok:
+                    say(f"OPENWRT_PATCH=FAIL {file.relative_to(ROOT)}")
+                    say(msg[-5000:])
+                    return 24
+                if re.search(r"(with fuzz|offset [+-])", msg):
+                    fuzzy.append(str(file.relative_to(ROOT)))
+                total += 1
+            say(f"OPENWRT_PATCH_DIR=PASS {dirname} count={len(files)}")
+        say(f"OPENWRT_BASELINE_PATCH_CHAIN=PASS applied={total} fuzz_or_offset={len(fuzzy)}")
+        for f in fuzzy[:20]:
+            say(f"OPENWRT_CONTEXT_ADJUSTED={f}")
+        stage_ok = 0
+        for relative in STAGED:
+            p = ROOT / relative
+            ok, msg = apply_patch(linux, p, strict=True)
+            if not ok:
+                say(f"DSA_STAGED_AFTER_FULL_OPENWRT=FAIL at={relative} pass={stage_ok}/{len(STAGED)}")
+                say(msg[-5000:])
+                return 25
+            say(f"DSA_STAGED_PATCH=PASS {relative}")
+            stage_ok += 1
+        say(f"DSA_STAGED_AFTER_FULL_OPENWRT=PASS {stage_ok}/{len(STAGED)}")
+        say("FULL_SOURCE_SCOPE=PATCH_APPLY_ONLY NO_KERNEL_CONFIG NO_ARM_COMPILE NO_BOOT NO_NSS_ACK")
+        return 0
+
+if __name__ == "__main__":
+    sys.exit(run())

@@ -12,7 +12,7 @@ permissions:
 jobs:
   staging-host-only:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
       - name: Exact staged patch chain matches tested host function
@@ -39,5 +39,7 @@ jobs:
         run: bash scripts/wg2600hp_ecm_pinned_preflight.sh
       - name: Exact upstream Linux 6.12.112 selected DSA patch-chain gate (host only)
         run: python3 scripts/wg2600hp_kernel_dsa_pinned_preflight.py
+      - name: Exact OpenWrt kernel archive + complete generic and ipq806x patch chain (SOURCE ONLY)
+        run: python3 scripts/wg2600hp_kernel_full_patch_preflight.py
       - name: Explicit scope boundary
         run: echo "HOST-ONLY PASS does not establish ARM kernel build, boot, IPv4 or NSS offload."
