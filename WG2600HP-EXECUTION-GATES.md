@@ -422,3 +422,10 @@
 - 対象WG2600HP/IPQ8064、ソース固定SHA `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa`。公開類似ミラーの`ecm_interface.c`を照合したが、`everything411/qsdk`は旧7ハンクのうち5件、`felix-fly/qsdk-12`は6件の文脈一致にとどまり、両者とも**固定版の証拠にはできない**。
 - `scripts/wg2600hp_ecm_pinned_preflight.sh`を追加し、CIの一時領域で公式pinをfetch→HEAD SHA検証→`100/115/200/210/215/220/300/400/401`→隔離`760-04/05`の順番で`patch --fuzz=0 -p1`適用。原本が取得できない場合は**BLOCKED（exit20）**、不一致の場合はFAIL（exit21）。実際に順番を保ったソース適用であり、ファームビルドはしない。
 - 既存の隔離ホスト専用workflowに限定して起動。CIログ確認前にPASSを付けない。通常作業ブランチとネットワーク/VLAN構成は変更しない。電源投入→起動・ARMコンパイル・NSS FWタグ処理・CREATE/ACK・Wi-Fi・IPIP6は依然未確認。**G1/G2未完、G3 FAIL、新FWビルド・書込み不可**。
+
+## 2026-11-01 第22セッション：固定ECM原本9パッチ＋760-04/05の実適用PASS
+
+- 対象機種WG2600HP/IPQ8064、隔離修正コミット `342e9daa7324f9ec781afe4551a6bc16e0ea1ccb`。GitHub Actions [#41273258293](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41273258293)、job `staging-host-only` 結果 `completed/success` をジョブログで直接確認。
+- 実際に Codelinaro から `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa` をfetchし、`git rev-parse HEAD` が完全一致：`ECM_PIN=VERIFIED`。一時チェックアウトへ`patch --batch --forward --fuzz=0 -p1`でOpenWrt既存`100/115/200/210/215/220/300/400/401`の9本、および`760-04/760-05`の2本を**この順番で適用して全11本PASS**、終了行`ECM_STAGED_APPLY=PASS`。各パッチSHA256がCIログに保存済み。これは公開類似ミラーの推測ではなく、**固定版への実適用検査**。
+- 同一ジョブでtagger模擬12/12、旧760-10負例検出、ネット監査8/8、ECM VLAN-awareガード6/6もPASS。
+- **適用PASSの範囲**は固定ECMソースへの差分反映、コンテキスト一致に限る。Cコンパイル/ARMリンク、Linux6.12.112へのDSA修正の実コンパイル、FW NSS CREATE/ACK、電源投入→RAM起動、IPv4 NSS実加速、Wi-Fi、固定IPIP6の実測はいずれも未確認。G1/G2未完、**G3 FAIL、ファームビルド・書込み不可**。
