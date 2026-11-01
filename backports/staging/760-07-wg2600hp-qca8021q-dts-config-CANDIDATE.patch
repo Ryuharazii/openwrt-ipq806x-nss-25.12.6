@@ -1,0 +1,44 @@
+From: WG2600HP isolated staging audit (2026-11-01)
+Subject: [CANDIDATE 760-07] select QCA 802.1Q on both DSA CPU ports
+
+NOT FOR BUILD OR DEPLOYMENT. Depends on complete and verified
+760-01 tagger, 760-02 QCA8K switch integration, 760-03 dual-CPU
+isolation, 760-06 error cleanup, and pinned ECM 760-04/05.
+Default Linux v6.12.112 dsa.c reads the "dsa-tag-protocol" DT
+property from each CPU port; both CPU ports in one switch tree must
+select the same protocol. Kconfig must also build the new tagger.
+No user-facing VLAN interfaces or board network settings are added.
+Do not merge until G1/G2 proof and rollback safety are complete.
+
+---
+--- a/target/linux/ipq806x/config-6.12
++++ b/target/linux/ipq806x/config-6.12
+@@ -330,7 +330,8 @@
+ CONFIG_NET_DSA=y
+ CONFIG_NET_DSA_QCA8K=y
+ CONFIG_NET_DSA_QCA8K_LEDS_SUPPORT=y
+ CONFIG_NET_DSA_TAG_QCA=y
++CONFIG_NET_DSA_TAG_QCA_8021Q=y
+ CONFIG_NET_EGRESS=y
+ CONFIG_NET_FLOW_LIMIT=y
+ CONFIG_NET_INGRESS=y
+--- a/target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts
++++ b/target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts
+@@ -157,7 +157,8 @@
+ 			port@0 {
+ 				reg = <0>;
+ 				label = "cpu";
+ 				ethernet = <&gmac1>;
++				dsa-tag-protocol = "qca-8021q";
+ 				phy-mode = "rgmii";
+ 				tx-internal-delay-ps = <1000>;
+ 
+@@ -205,7 +205,8 @@
+ 			port@6 {
+ 				reg = <6>;
+ 				label = "cpu";
+ 				ethernet = <&gmac2>;
++				dsa-tag-protocol = "qca-8021q";
+ 				phy-mode = "sgmii";
+ 				qca,sgmii-enable-pll;
+ 				qca,sgmii-rxclk-falling-edge;
