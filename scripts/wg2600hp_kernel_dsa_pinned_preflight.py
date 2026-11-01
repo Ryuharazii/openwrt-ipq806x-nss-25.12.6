@@ -145,6 +145,16 @@ def run():
                 print(f"DSA_REQUIRED_FIX={name}", flush=True)
             print("DSA_SCOPE=DIAGNOSTIC_GIT_FALLBACK_ONLY NO_BUILD NO_BOOT NO_NSS_ACK", flush=True)
             return 21
+        defs = re.findall(
+            r"(?m)^#define\s+DSA_TAG_PROTO_([A-Z0-9_]+)_VALUE\s+(\d+)\s*$",
+            (scratch / "include/net/dsa.h").read_text(encoding="utf-8"))
+        numeric = {}
+        for name, number in defs:
+            numeric.setdefault(int(number), []).append(name)
+        if any(len(names) != 1 for names in numeric.values()) or numeric.get(30) != ["QCA_8021Q"]:
+            print(f"DSA_SELECTED_PROTOCOL_IDS=FAIL {numeric}", flush=True)
+            return 26
+        print("DSA_SELECTED_PROTOCOL_IDS=PASS QCA_8021Q=30 (no 611-01 on upstream subset)", flush=True)
         print("DSA_PATCH_CHAIN=PASS 7 verified upstream source files, 12 patch steps", flush=True)
         print("DSA_SCOPE=SELECTED_SUBSET_ONLY NO_OPENWRT_FULL_PATCHSET NO_COMPILE NO_BOOT NO_NSS_ACK", flush=True)
         return 0

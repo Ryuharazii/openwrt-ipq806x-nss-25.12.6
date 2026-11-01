@@ -198,6 +198,17 @@ def run():
                 return 25
             say(f"DSA_STAGED_PATCH=PASS {relative}")
             stage_ok += 1
+        tag_defs = re.findall(
+            r"(?m)^#define\s+DSA_TAG_PROTO_([A-Z0-9_]+)_VALUE\s+(\d+)\s*$",
+            (linux / "include/net/dsa.h").read_text(encoding="utf-8"))
+        ids = {}
+        for label, number in tag_defs:
+            ids.setdefault(int(number), []).append(label)
+        duplicates = {num: names for num, names in ids.items() if len(names) > 1}
+        if duplicates or ids.get(29) != ["BRCM_LEGACY_FCS"] or ids.get(30) != ["QCA_8021Q"]:
+            say(f"DSA_PROTOCOL_ID_UNIQUE=FAIL id29={ids.get(29)} id30={ids.get(30)} duplicates={duplicates}")
+            return 26
+        say("DSA_PROTOCOL_ID_UNIQUE=PASS ID29=BRCM_LEGACY_FCS ID30=QCA_8021Q")
         say(f"DSA_STAGED_AFTER_FULL_OPENWRT=PASS {stage_ok}/{len(STAGED)}")
         say("FULL_SOURCE_SCOPE=PATCH_APPLY_ONLY NO_KERNEL_CONFIG NO_ARM_COMPILE NO_BOOT NO_NSS_ACK")
         return 0

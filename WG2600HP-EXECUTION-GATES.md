@@ -491,3 +491,9 @@
 - 初回全ツリー検証 [#41274644893](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274644893)：OpenWrt指定sha256 `164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`の公式Linux6.12.112 tar.xz（148648524 byte）を実取得・hash一致、source全展開、generic-files/IPQ806x overlay複写。**generic backport 277/277件実適用PASS**。次の`pending-6.12/760-01`が`include/net/dsa.h`最初のハンクでFAIL。2番目のハンク・Kconfig・Makefile・新taggerは適用されていたが**一部成功を全体PASS扱いしない**。ダウンストリーム残りpending/hack/targetと隔離760系は未検査。
 - 直前の選択12本PASSは「素のLinux+711/712」の限定試験であり、今回OpenWrt全パッチの先行条件ではない。今回の結果が**優先**。修正を急がず、277本のうち`include/net/dsa.h`を触る候補と、760-01適用直前の実ソース周辺、git apply/strict GNUの差をCIで取得する診断を追加。根拠が出るまでパッチ本体は変更しない。
 - **G1/G2未完、G3 FAIL**、ファームビルド・RAM起動・フラッシュ無し。通常ブランチとLAN/WAN設定は不変更。
+
+## 2026-11-01 第24セッション：全OpenWrt適用で発見したDSA proto ID 29の衝突を隔離修正
+
+- 根拠：全ソースCI [#41274742598](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274742598)により、`include/net/dsa.h`の現物に既存`DSA_TAG_PROTO_BRCM_LEGACY_FCS_VALUE=29`を確認。導入パッチは`target/linux/generic/backport-6.12/611-01-v6.17-net-dsa-tag_brcm-add-support-for-legacy-FCS-tags.patch`。この既存backport後に現行候補`760-01`の`QCA_8021Q_VALUE=29`が重複し、最初のハンクはGNUとgit apply両方FAIL。**単なる空白/位置問題ではなく、プロトコル識別子の実質的衝突**。
+- 隔離`760-01`の追加タグ識別値を**30**へ変更。定義の追加位置は既存28番の直後の3行文脈で固定し、素のLinux6.12とOpenWrtの611-01適用後の両方に一致可能にする。その他DSAタグコード/DSAユーザーポート/WAN/LAN設定は変更しない。host-only二重ゲートに追加の番号一意性検査を加え、全kernelでは29=BRCM_LEGACY_FCS、30=QCA_8021Qを必須とする。コンパイルや実ネットワークの検証と混同しない。
+- この変更の実際のOpenWrt全パッチ連続適用および選択12本結果は**CI前は未確認**。G1/G2未完、G3 FAIL、ファームビルド/書込み禁止。
