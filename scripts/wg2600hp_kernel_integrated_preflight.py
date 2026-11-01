@@ -102,6 +102,78 @@ def apply_patch(linux, patchfile, strict):
     msg = p.stdout.decode("utf-8", errors="replace")
     return p.returncode == 0, msg
 
+def cross_compile_dsa_objects(linux):
+    """Compile selected real ARM objects; never generate a firmware image."""
+    import shutil
+    cc = "arm-linux-gnueabihf-"
+    if not shutil.which(cc + "gcc"):
+        say("ARM_OBJECT=BLOCKED missing ARM cross GCC")
+        return 31
+    env = {**os.environ, "ARCH": "arm", "CROSS_COMPILE": cc,
+           "KBUILD_BUILD_USER": "wg2600hp-audit", "KBUILD_BUILD_HOST": "isolated"}
+    def make(args, label, seconds=180):
+        cmd = ["make", "-C", str(linux), "-j2"] + args
+        say(f"ARM_OBJECT_STEP=BEGIN {label}")
+        try:
+            result = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True,
+                                    timeout=seconds, check=False)
+        except subprocess.TimeoutExpired as error:
+            say(f"ARM_OBJECT_STEP=TIMEOUT {label}: {error}")
+            return False
+        if result.returncode:
+            say(f"ARM_OBJECT_STEP=FAIL {label} code={result.returncode}")
+            say(result.stdout[-18000:])
+            return False
+        say(f"ARM_OBJECT_STEP=PASS {label}")
+        if result.stdout:
+            say(result.stdout[-2800:])
+        return True
+
+    if not make(["multi_v7_defconfig"], "multi_v7_defconfig", 150):
+        return 32
+    cmd = [str(linux / "scripts/config")]
+    enabling = ("NET_DSA", "NET_DSA_QCA8K", "NET_DSA_TAG_QCA",
+                "NET_DSA_TAG_QCA_8021Q", "VLAN_8021Q", "BRIDGE",
+                "NET_SWITCHDEV", "NET_DSA_TAG_8021Q")
+    c = subprocess.run(cmd + [arg for item in enabling
+                                for arg in ("-e", item)],
+                       cwd=linux, env=env, stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT, text=True, check=False)
+    if c.returncode:
+        say(f"ARM_OBJECT=FAIL scripts/config: {c.stdout}")
+        return 33
+    if not make(["olddefconfig"], "olddefconfig", 180):
+        return 34
+    config=(linux / ".config").read_text()
+    for key in ("CONFIG_NET_DSA=y", "CONFIG_NET_DSA_QCA8K=y",
+                "CONFIG_NET_DSA_TAG_QCA_8021Q=y"):
+        if key not in config.splitlines():
+            say(f"ARM_OBJECT=FAIL required Kconfig option unresolved: {key}")
+            return 35
+    say("ARM_OBJECT_KCONFIG=PASS NET_DSA, QCA8K and QCA_8021Q built-in")
+    if not make(["prepare"], "ARM_prepare", 240):
+        return 36
+    for obj in ("net/dsa/tag_qca_8021q.o", "net/dsa/tag_8021q.o",
+                "drivers/net/dsa/qca/qca8k-common.o",
+                "drivers/net/dsa/qca/qca8k-8xxx.o"):
+        if not make([obj], obj, 240):
+            return 37
+        artifact = linux / obj
+        if not artifact.is_file() or artifact.stat().st_size < 2000:
+            say(f"ARM_OBJECT=FAIL no object bytes {obj}")
+            return 38
+        readelf = subprocess.run([cc + "readelf", "-h", str(artifact)],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True,
+                                 check=False)
+        if readelf.returncode or "Machine:                           ARM" not in readelf.stdout:
+            say(f"ARM_OBJECT=FAIL object is not ARM {obj}: {readelf.stdout[-1000:]}")
+            return 39
+        say(f"ARM_OBJECT=PASS {obj} size={artifact.stat().st_size} ELF_MACHINE=ARM")
+    say("ARM_OBJECT_CHAIN=PASS selected 4 objects compiled for ARM, NOT LINKED, NO FW, NO BOOT")
+    return 0
+
 def run():
     try:
         ensure_pin()
@@ -213,7 +285,13 @@ def run():
             return 29
         say("OPENWRT_ROLLBACK_CANDIDATE=SOURCE_PRESENT not hardware verified")
         say(f"DSA_STAGED_AFTER_FULL_OPENWRT=PASS {stage_ok}/{len(STAGED)}")
-        say("FULL_SOURCE_SCOPE=PATCH_APPLY_ONLY NO_KERNEL_CONFIG NO_ARM_COMPILE NO_BOOT NO_NSS_ACK")
+        if "--arm-objects" in sys.argv[1:]:
+            result = cross_compile_dsa_objects(linux)
+            if result:
+                return result
+            say("FULL_SOURCE_SCOPE=ARM_DSA_OBJECTS_ONLY NO_OPENWRT_FIRMWARE NO_BOOT NO_NSS_ACK")
+        else:
+            say("FULL_SOURCE_SCOPE=PATCH_APPLY_ONLY NO_KERNEL_CONFIG NO_ARM_COMPILE NO_BOOT NO_NSS_ACK")
         return 0
 
 if __name__ == "__main__":

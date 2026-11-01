@@ -25,3 +25,14 @@ Known unresolved: 760-08/09 explicitly acknowledge switch VLAN partial hardware 
 ## Verified CI source chain after 760-12
 
 [GitHub Actions #41277303359](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41277303359): full upstream 6.12.112 kernel unpack, all **594** active OpenWrt patches applied, DSA tag ID 29/30 unique, new rollback code found, assembly guard PASS. This is not a kernel compile, fault injection, or hardware safety proof. G1/G2 incomplete; G3 FAIL.
+
+## 2026-11-01 ABI/compiler gate for 760-12
+
+The isolated optional `--arm-objects` mode applies the exact sha256-pinned
+Linux 6.12.112 archive + all 594 OpenWrt patches, configures multi_v7 ARM,
+enables DSA/QCA8K/QCA8021Q, and compiles **only** 4 real ARM object files
+(tag_qca_8021q, tag_8021q, qca8k-common, qca8k-8xxx). Checks ELF machine ARM.
+It never creates a WG2600HP firmware, modifies hardware, or declares G3 PASS.
+
+A newly added CI workflow will attempt this on the integrated isolated branch.
+Prior to its actual run result, ARM compilation remains UNKNOWN.
