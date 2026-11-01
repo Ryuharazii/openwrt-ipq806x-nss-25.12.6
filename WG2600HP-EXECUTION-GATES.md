@@ -325,3 +325,13 @@
 - **修正後のローカル実行テスト**: GitHub読戻しblob `51085684e8e1acd5a54dbdeadf7c9ce4cb2efae0`と隔離ファイルの`git hash-object`が完全一致。テストファイルblob `0432167241d07db2fb9a21f5c46c2b535081a3c1`も完全一致。`sh -n` PASS、Python `unittest` 6/6 PASS（デフォルト未実証exit3、棚卸しexit0かつUNVERIFIED、ネットワーク機器欠落exit1、DSA失敗exit1、別機種exit2、不明引数exit2）。試験は**Linuxホストで生成した/sys・dmesg等の模擬入力**であり、WG2600HP実機結果ではない。
 - **回帰・依存範囲**: スクリプトのみの読取専用変更。起動設定、DTS、カーネル、ECM、NSS、Wi-Fi、固定IPIP6、Firmwareは未編集。隔離ブランチのみで本作業/ビルドブランチへの統合なし。**既存ビルド済みRAMファーム内のスクリプトは未変更**。加速の実機証明には外部トラフィックを流した際のNSS CREATE/ACK、ECMの加速状態とNSS statsの前後増分が必要。
 - **ゲート**: 今回の成果は「誤PASS防止コードと模擬テスト」のみ。電源投入→実機起動完了の連続テスト、全経路横断回帰、ARMビルド、実機NSS加速は未実施。**G1/G2未完了、G3 FAIL、新ビルド/フラッシュ不可**を維持。次の本筋はECM物理IF登録とDSAタグ互換性の実ソース照合。
+
+## 2026-11-01 実ARM ELFから確定したNSS物理IF対応とECM呼出し
+
+- **直接の実体**: ユーザー提供 `WG2600HP-IPQ8064-25.12.6-NSS(20261101-012709).zip`、SHA256 `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。新ファームではなく10/31旧ビルドと同一。uImage→XZ→newc initramfsから2つのELF32 ARMモジュールを実抽出。`lib/modules/6.12.112/qca-nss-drv.ko` (295600 B、SHA256 `4f98ff12dd4e8457599a51542f3e7c49bee650f9afb035d6ce621a5204fa6ff6`) と `lib/modules/6.12.112/ecm.ko` (567032 B、SHA256 `58df95b7a28c8cb7f2bbf836ad0c6df90ca6b61006f21dfc8eccf7ebd1389800`)。
+- **解析実行**: `readelf -Ws` で実シンボル表、`llvm-objdump -dr --disassemble-symbols=...` でARM命令・再配置を確認。隔離実行の機械語/呼出し条件チェックは9/9一致。これは**実ファームの静的解析**であり、仮想起動や実機実行ではない。
+- **NSS側：旧ファーム内の実際の実装を直接確認**: `nss_cmn_get_interface_number_by_dev` はtext offset `0x328`、136 B。ARM命令 `cmp r1, r2` で呼出し元の`net_device*`と登録済みネットワーク機器のポインタを比較、型フィールドも確認する。一致が無ければ`0x3a4: mvn r0, #0`で`-1`返却。`nss_cmn_get_interface_number_by_dev_and_type`もoffset `0x60`で同系の照合。これで従来の「類似公開実装からの推測」を**今回の収録済みNSSドライバについて直接実証**。
+- **物理GMAC登録の実経路**: `__nss_data_plane_register` text offset `0x16020`で`R_ARM_CALL nss_gmac_get_netdev_by_macid`、`R_ARM_CALL nss_gmac_override_data_plane`、`R_ARM_CALL nss_core_register_subsys_dp`を確認。`nss_core_register_subsys_dp` offset `0x0bfc`はネットワーク機器をNSSの登録レコードに書き込む命令を持つ。よって**物理GMACの登録経路が実バイナリに組み込まれている**。
+- **ECM側の直接呼出し確認**: `ecm.ko`に`ecm_nss_common_get_interface_number_by_dev`の複数実装あり、各々`R_ARM_JUMP24 nss_cmn_get_interface_number_by_dev`で検索を委譲する。`nss_cmn_get_interface_number_by_dev_and_type`の未定義外部参照もある。一方で`readelf -Ws`の外部未定義シンボルには`dsa_*`が見つからない（**インライン処理まで不在を証明するものではない**）。
+- **実機ログとの整合**: 旧RAM起動ログで`lan1 / br-lan / wan AE IF=-1`、`FAIL_RULE=-2`、`ipv4_create_requests=0`。上記の「登録されているネットワーク機器にしかIF番号を返さない」実バイナリと整合する。**ECMのDSA user port階層解決が主要修正対象**。ただしIF番号だけを書き換えたらNSSがQCA 2バイトヘッダを解釈できるとする証拠はまだない。MAC/NSS FWとDSAヘッダの全経路検証を必須とする。
+- **未実施と合否**: pinnedソース原本の直接取得、760系DSA/ECM候補の統合・ARM実ビルド・仮想フル電源投入/実機起動・NSS fw create ACK・実カウンタの増分は未実施。ユーザー向けVLAN設定も追加していない。**G1/G2未完了、G3 FAIL、書込み禁止**。
