@@ -87,8 +87,19 @@ int main(void) {
         struct sk_buff skb={.offload_fwd_mark=t[i].marked, .upper_tagged=t[i].upper_tagged};
         p.bridge=t[i].bridged?&bridge:NULL;
         qca_8021q_xmit(&skb, &dev);
-        bool ok=skb.tagged==t[i].expected_tagged && skb.vid==t[i].expected_vid;
-        printf("%s %s tagged=%u vid=0x%x\n", ok?"PASS":"FAIL",t[i].label,skb.tagged,skb.vid);
+        bool model_match=skb.tagged==t[i].expected_tagged && skb.vid==t[i].expected_vid;
+        /*
+         * DSA bridge_join removes standalone VID from the switch.
+         * A matching result is therefore still invalid if CPU TX
+         * uses the deleted standalone VID after a successful join.
+         * Do not convert this known hazard into a passing test.
+         */
+        bool dead_bridge_vid=t[i].bridged && t[i].offload &&
+                             skb.tagged && skb.vid==0x110;
+        bool ok=model_match && !dead_bridge_vid;
+        printf("%s %s tagged=%u vid=0x%x model=%s old_vid_invalid=%s\n",
+               ok?"PASS":"FAIL",t[i].label,skb.tagged,skb.vid,
+               model_match?"match":"mismatch",dead_bridge_vid?"yes":"no");
         if(!ok)errors++;
     }
     printf("HOST_ONLY %zu cases, %u failed\n",sizeof(t)/sizeof(t[0]),errors);
