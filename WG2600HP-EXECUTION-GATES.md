@@ -270,3 +270,10 @@
 - **DSA横断照合**: Linux `v6.12.112` の `net/dsa/dsa.c` はCPUポート毎に `dsa-tag-protocol` を参照し、2 CPUポートのタグ方式を一致させる。隔離版DTSではCPU0/6とも未指定、`config-6.12` もQCA_8021Q未選択。両CPUへの指定とKconfig選択を **隔離のみ** `backports/staging/760-07-wg2600hp-qca8021q-dts-config-CANDIDATE.patch` として記録（commit `356d66f8569b8f5f84c5a88592983f5f6e32b113`）。6条件静的確認PASS、GitHub読戻し一致。**現行ビルドには未適用**。
 - **重大な未解決回帰**: `760-02` の `qca8k_change_tag_protocol()` は QCA_8021Q→QCA 復帰時、`dsa_tag_8021q_unregister()` と状態変更を先行させた後の `qca8k_set_tag_8021q_vlan_mode` / PVID / header書込失敗をそのまま返し、元のVLAN・ヘッダー設定へ復帰しない。Linux `v6.12.112 net/dsa/dsa.c` の `dsa_tree_change_tag_proto()` はエラー時に旧taggerへ戻す通知を行うため、**DSA状態とQCA8337実ハード状態が食い違う危険**。さらに `760-06` のpartial-register rollbackは未試験。 **G2未確認・G3 FAIL、staging候補の適用/ビルド/フラッシュ禁止を維持**。
 - 既存動作済みの有線IPv4通信は引き続き比較基準。**完成要件は有線IPv4・Wi-Fi・固定IPIP6のNSS高速化の実機証明**。検証していない項目にPASSを付けない。
+
+## 2026-11-01 隔離DSAの復帰時ロールバック修正と連続パッチ文脈検証
+
+- **コード修正実施（隔離のみ）**: `backports/staging/760-02-net-dsa-qca8k-8021q-driver-6.12-CANDIDATE.patch`（commit `19b1c020169839dc249b203a1fa75ac348deadc7`）。QCA_8021Q→QCA復帰時に、VLAN contextの破棄をすべての失敗し得るVLAN mode/PVID/header書込の後に移動し、それ以前に失敗した場合は8021Q header/VLAN mode/各port PVIDの復元を試みる。逆方向のQCA→QCA_8021Q失敗時にも元PVIDへの復元を追加。成功・復旧が保証されたと主張せず、各rollback再失敗は `dev_err` で記録。
+- **実際に再取得したLinux v6.12.112ソースで確認**: `qca8k.h`、`qca8k-8xxx.c`、`qca8k-common.c` への既存 `711-01`（3/3）、`711-02`（1/1）、`711-03`（2/2）、`712`（3/3）に続いて、修正版 `760-02`（28/28）の **37/37 unified-diff文脈が順次一致**（ソースをメモリ上で更新した静的検証）。GitHub新blob `1428da306d27b101a9f40733c99e8cba72a8b9fd` を読み戻し一致。
+- `net/dsa/tag_8021q.c` の Linux v6.12.112 基準に `760-03` と `760-06` を順次適用する文脈検証は **2/2一致**。合計39/39パッチ文脈一致。ただし `760-06` の未初期化portへの teardown／部分失敗時のhardware rollbackに問題がないかは未解決。
+- **未確認（G2/G3）**: 実コンパイル、MDIO書込失敗時の全ポート回復、2 CPUポートのフレーム分離、pinned ECM `760-04/05` のOpenWrt適用順、Wi-Fi NSS/固定IPIP6/NSS IPv4実機オフロード。**G3 FAIL・新規ファームビルドは実行しない。**
