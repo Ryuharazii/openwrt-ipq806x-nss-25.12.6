@@ -594,3 +594,11 @@
 - 変更コミット `f9d4e00a18d4b2cdc013b16fcb9bc353e4f689c0`、対象 `package/qca-nss/qca-nss-clients/patches/140-wg2600hp-tunipip6-lifecycle-atomic-free.patch`。既存のNETDEV_DOWNと一括削除における `debugfs_remove(dentry)` を `vfree(ntii)` より前へ移動。いずれもspinlock解放後。debugfs利用中の解放済みcontext参照を避けることが目的。
 - GitHub読戻しで変更SHA `6e006b362e4e0063b35f606338ff938b7c7fcdc7`、unified-diff 4ハンクの旧/新行数整合4/4を確認。実ソースへの適用・コンパイル・実機RAM起動は未実施のため**G2/G3をPASSとしない**。
 - ユーザーがキャンセルした `.github/workflows/build-wg2600hp-nss.yml`（空ファイル）を上書きせず、フルビルド・フラッシュを自動起動しない。新ファーム・有線IPv4/Wi-Fi/IPIP6 NSS高速化の実機証拠は未取得。
+
+## 2026-11-01 追加：固定IPIP6停止処理の実コード修正
+
+- ブランチ: wg2600hp-nss-integrated-candidate-20261101。対象WG2600HP / IPQ8064 / 25.12.6。既存空ビルドワークフローは変更なし。
+- 5e62c2a2e5b0af4f23e3f1ec8fe10d7e4799f092: 140パッチで module-exit NSSインターフェース破棄後に dev_put(netdev) を移動。GitHub読戻し確認。
+- 437237ed1ffa4bdfe9fddcd948b6a9193a5f9bc3: 141パッチをactive qca-nss-clientsへ追加。INNER/OUTER の NSS unregister を dynamic IF dealloc より前へ移動。dealloc ACK は dynamic IF のtypeをNONEにするが unregister API は有効なtypeを要求するため。
+- 検査範囲: GitHub再取得で140処理順と141の2パッチハンク行数を確認。実ソースパッチ適用・ARMモジュールビルド・RAM起動・固定IPIP6 FW ACKは未確認。
+- 残留: dealloc NACK時の復旧設計、全経路回帰、有線IPv4/無線/固定IPIP6実機高速化。G1/G2未完、G3 FAIL。ビルドなし。
