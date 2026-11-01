@@ -559,3 +559,10 @@
 - 同梱FWのメタデータ：Synology RT2600ac由来の記載、`nss_fw_version.h`の11.4宣言。nss0 retailバイナリ588512B／SHA256 `5689c13b0f26fe2b7a67cda33c884df7314116588c80ce37a1717e1a3c790556`、nss1 220780B／SHA256 `92ea2b530672881078dfce99970435516e45bb8e194d0264f5e0e6db3f84d4c0`。メタデータ/ハッシュ検査PASSのみ。バイナリ内部の機能や11.4との実整合は未確認。
 - 同CIでOpenWrt Linux6.12.112の既存586パッチとDSA隔離7/7 strict適用、NSS drv9/GMAC10パッチ、DTS-config760-07の単独strict適用もPASS。今回さらに両IPv4 frontendがVALID flagと ingress/egressフィールドを持つことを**厳格に検査する小ゲート**を追加。ゲート結果は次のCI実行後まで未判定。
 - 今後はソース上の情報だけでG3を解除しない。WG2600HPのファーム側QCA8021Q受理、NSS IPv4 CREATE/ACK・カウンターを確認していない。**G1/G2未完了、G3 FAIL**。通常ブランチ、ユーザーLAN/WAN/VLAN設定変更なし。ビルド・フラッシュなし。
+
+## 2026-11-01 第26セッション：NSS/ECM IPv4 VLANルールABI交差検証を実行PASS
+
+- 実行コミット`ebc48ea9dbec1b962c1f4e482e7ee0c83a7b174a`。GitHub Actions [#41276237249](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276237249) `completed/success`、job`124758855540`の実ログを確認。`ECM_IPV4_VLAN_FRONTEND=PASS`は`ecm_nss_ported_ipv4.c`と`ecm_nss_non_ported_ipv4.c`の2件。各パスに`NSS_IPV4_RULE_CREATE_VLAN_VALID`とprimary ingress/egress VLAN tagをセットするソース行が存在する。NSS driver pinの`exports/nss_ipv4.h`についても`IPV4_RULE_ABI=PASS`：VLAN有効フラグとprimary/secondary VLAN create ruleフィールドが存在。
+- NSS固有の`NSS_DRV_VLAN_ENABLE`は無効であるものの、**NSS IPv4 CREATE構造へのVLAN情報指定はdriver ABIとして存在し、ECM側から書込む実装もある**。よって`NSS_DRV_VLAN_ENABLE=n`のみを理由にIPv4ルール経路を阻害と決めつけない。ただし**ファームウェアがこのルールを受け取り適用できるか、QCA8021qタグが物理入力で成立するか**は未証明。テストログは`ECM_IPV4_RULE_SCOPE=ABI_ONLY NOT_NSS_FW_SUPPORTED NOT_NSS_CREATE_ACK`と明示。
+- 同一CI：ECM固定pin＋11件、OpenWrt全kernel586パッチ、DSA候補7/7、選択DSA13パッチ、NSS driver9件・GMAC10件が継続PASS。FW2個の正確なファイル長とSHA256、`nss_fw_version.h`のバージョン宣言11.4、READMEでのSynology RT2600ac由来の記載を確認。バイナリ解析禁止のライセンス文言を尊重し、**FW内解析によるタグ処理証明を主張しない**。
+- 次の残課題：DSA/ECM→NSS IF解決・NSS物理GMAC VLANタグ処理、IPv4 CREATE/ACKの実機計測、電源投入から全起動段階の確認、Wi-Fi、固定IPIP6。通常ブランチ/WAN/LAN/VLAN設定不変更。**G1/G2未完、G3 FAIL、ファームビルド・フラッシュなし**。

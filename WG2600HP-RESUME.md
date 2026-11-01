@@ -116,3 +116,10 @@
 - **既に存在するGMAC/DSA対応**: `package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch`が`netdev->dev.of_node = pdev->dev.of_node`を設定する。OpenWrt 711-03には`.port_change_conduit`。現行の`wan→eth0`/`lan→eth1`設定も存在するため、これらを無視して新たな別構成に置き換えない。
 - **次の横断確認対象**: 現行pinの`nss_cmn_get_interface_number_by_dev`とデータプレーン登録、ECM hierarchical iface resolution、QCAヘッダのNSSファームウェア側解釈・`eth_rx_unknown_l3_protocol`実カウンター、CPU0/6のL2分離、IPv4/固定IPIP6/Wi-Fiの相互影響。追加VLAN設定を要求しない。障害が2つある可能性を踏まえ、局所変更だけでPASSにしない。
 - **判定**: 今回はGitHub作業版/公式Linux6.12.112/公開NSS類似実装のソース横断照合のみ。現行pinソース直接比較・QEMU/電源投入→起動完了・ARMコンパイル・新RAM実機試験・NSS高速化の検証は未実施。G1/G2未完了、G3 FAIL。**新パッチ統合・ビルド・フラッシュなし**。
+
+## 2026-11-01 第26セッションの最新引継ぎ（前回から継続、方向転換禁止）
+
+- **隔離ブランチ** `wg2600hp-nss-audit-gate-isolated-20261101`、検証台帳 `WG2600HP-EXECUTION-GATES.md` を基準に再開。通常ブランチ`wg2600hp-nss-gmac-no-phy-20261031`に変更なし。
+- 新CI [#41276237249](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276237249) `completed/success`：実source pin NSS driver`3cfb9f43`＋9パッチ、GMAC`17176794`＋10パッチ、ECM`9acdcb05`＋既存9/隔離760-04/05の11パッチ、Linux6.12.112へのOpenWrt586パッチ＋隔離DSA7パッチ、DTS設定760-07単独適用がPASS。**すべてソース/host-onlyの検証であって起動試験ではない**。
+- 新発見：ECM ported/nonported IPv4 CREATEの`NSS_IPV4_RULE_CREATE_VLAN_VALID`とprimary VLANタグの両方向設定は、実pin driverの`exports/nss_ipv4.h`の対応ABIと整合。専用`NSS_DRV_VLAN_ENABLE=n`でもIPv4ルール構造のVLANフィールドは存在するため、一律にFW非対応とは断定不可。**FWがQCA 802.1Q物理タグを解析する証拠やCREATE/ACK/RX-TX統計は依然無し**。FW本体の内部解析はしない。
+- 旧実機の`AE IF=-1`、`FAIL_RULE=-2`、NSS CREATE=0は未解決。次は実機のDSA→GMACの階層、ECM NSS IF解決とFW VLANタグ受信を、電源投入→起動と通信・オフロード実測で証明する前提。**G1/G2未完、G3 FAIL**。ユーザーに既存条件の再説明を求めず、VLAN追加/ルーティング設定変更/ARMファームビルド/フラッシュを無断実施しない。
