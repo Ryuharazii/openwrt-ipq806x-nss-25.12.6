@@ -629,3 +629,13 @@
 **安全隔離（本統合に追加しない）**: 760-06の全内容を backports/staging/760-06-ecm-ipv4-physical-nexthop-fallback-CANDIDATE.patch へ同一blob SHA 7e8b215d360a7cfee665ac2073856661cf3d8694 で保存（commit a630def1907d0a7253aa701b84c3916fcecfe3ce）、activeから撤回（commit d43bbba02e337c30978f00f437bb38766a9a4e33）。GitHubでactive11本、staging残存、2つのfull-build workflowが各改行1文字と確認。これは破綻したビルド入力の隔離であり加速実証でも新たなビルドPASSでもない。
 
 **確定ゲート**: G0=PASS（既存台帳確認のみ）、G1=未確認（現行候補の全起動経路）、G2=未確認（現行変更後の実機下流回帰）、G3=FAIL。実機RAM起動、FW IPv4 ACK、Wi-Fi、固定IPIP6の高速化は未確認。新ファームのビルド・フラッシュは開始しない。
+
+## 2026-11-01 WG2600HP QCA8021Q DSA MTU前段阻害の解消候補
+
+- **起動から通信までの関係（具体的なコード根拠）**: Linux v6.12.112 の `net/ethernet/eth.c:ether_setup()` は `dev->max_mtu=ETH_DATA_LEN` (=1500) を初期化。 `net/core/dev.c:dev_validate_mtu()` はその上限を超えると `-EINVAL` を返す。 `net/dsa/conduit.c:dsa_conduit_setup()` は `ETH_DATA_LEN + dsa_tag_protocol_overhead(tag_ops)` をGMACへ設定する。統合したQCA8021Q tagger（`760-01`）は `.needed_headroom=VLAN_HLEN`（4バイト）。旧RAM実機の `eth0/eth1: error -22 setting MTU to 1502` と同種の上限衝突が統合版では1504で起こり得る。
+- **修正前の横断影響**: 電源投入→カーネル→NSS-GMAC eth0/eth1→QCA8337 CPU0/6→WAN/LAN→ECM/NSSのうち、DSA setup時のconduit MTU変更が上流の `dev_validate_mtu` で拒否される。旧実機でLAN→WAN IPv4 ping/HTTPSが成立した事実と、DSA初期化警告を無視できることは同義ではない。
+- **限定変更**: commit `a7eb4b53bc69366f2f6ada2573128884690dfae5`、active `package/qca-nss/qca-nss-gmac/patches/10-wg2600hp-nss-gmac-dsa-mtu-6.12.patch`。 `of_machine_is_compatible("nec,wg2600hp")` の場合だけ `netdev->max_mtu=ETH_DATA_LEN+VLAN_HLEN` にする。通信MTU1500は維持。別機種へ変更なし、NSS phys-ifのMTU更新成否判断は従来処理のまま。
+- **修正後の下流・回帰条件**: patch 2ハンクの行数整合、公開NSS-GMAC参照ソースの双方の修正アンカー、Linux6.12.112の `VLAN_HLEN` 定義と `dev_validate_mtu` の返値を照合。commit `028d6c56534bc967918c49c854e68a756bc66a62` で `scripts/wg2600hp_cross_audit.py` にターゲット限定のmax_mtu検査を追加。**このソース照合は実FWの成功証拠ではない**。
+- **未実行**: exact pinned NSS-GMAC（171767947467662f2407d0cfff26dfb136c3fb4a）+10 activeパッチの実適用、ARMビルド・モジュールリンク、FWの `nss_phys_if_change_mtu` ACK、現行統合RAM版のDHCP/IPv4・MTU・DSA CPU0/6回帰、有線NSS CREATE/ACK、Wi-Fi、固定IPIP6。これらのPASSは主張しない。
+- **ゲート**: 当該障害のソース上の原因と修正候補は確認したが、G1/G2全体=未達、G3=FAIL。無断CI再開・ファームビルド・sysupgradeなし。既存のbuild workflow 2件はユーザーが空にした状態を維持する。
+
