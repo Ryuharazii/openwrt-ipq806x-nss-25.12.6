@@ -485,3 +485,9 @@
 - 作業対象WG2600HP（IPQ8064）、Linux 6.12.112。公式 `include/quilt.mk`および`target/linux/generic/PATCHES.md`を照合し、**backport→pending→hack→ipq806x target** が実際の適用順と確認。`target/linux/generic/kernel-6.12`に`LINUX_KERNEL_HASH-6.12.112=164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`がある。
 - 隔離専用`scripts/wg2600hp_kernel_full_patch_preflight.py`を導入：このhashと一致する公式ソースtarballを一時領域へ取得・SHA256検証・展開、OpenWrt generic/IPQ806xオーバーレイを複写後、上記の公式順で**全patchファイル**を`patch -f -p1`（OpenWrt相当）で適用。拒否時は即FAIL。続いて元のstaging`760-02/03/06/08/09/10/11`を`--fuzz=0`で適用し、先行`760-01`との整合を確認。大量ソースはCI一時領域のみ、本repo通常ブランチに追加せず削除。
 - **CIログ確認までは未検証**。対象はソースのパッチ適用のみであり、Kconfig/ARM/DSA hardware/NSS accelerated packets/IPv4/Wi-Fi/TUNIPIP6の成功ではない。そもそもstaged patchは通常ビルドへ組み込まれていない。G1/G2未完、G3 FAIL、ファームビルド・フラッシュ禁止。
+
+## 2026-11-01 第24セッション：OpenWrt backport後の760-01競合を特定（診断追加）
+
+- 初回全ツリー検証 [#41274644893](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274644893)：OpenWrt指定sha256 `164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`の公式Linux6.12.112 tar.xz（148648524 byte）を実取得・hash一致、source全展開、generic-files/IPQ806x overlay複写。**generic backport 277/277件実適用PASS**。次の`pending-6.12/760-01`が`include/net/dsa.h`最初のハンクでFAIL。2番目のハンク・Kconfig・Makefile・新taggerは適用されていたが**一部成功を全体PASS扱いしない**。ダウンストリーム残りpending/hack/targetと隔離760系は未検査。
+- 直前の選択12本PASSは「素のLinux+711/712」の限定試験であり、今回OpenWrt全パッチの先行条件ではない。今回の結果が**優先**。修正を急がず、277本のうち`include/net/dsa.h`を触る候補と、760-01適用直前の実ソース周辺、git apply/strict GNUの差をCIで取得する診断を追加。根拠が出るまでパッチ本体は変更しない。
+- **G1/G2未完、G3 FAIL**、ファームビルド・RAM起動・フラッシュ無し。通常ブランチとLAN/WAN設定は不変更。

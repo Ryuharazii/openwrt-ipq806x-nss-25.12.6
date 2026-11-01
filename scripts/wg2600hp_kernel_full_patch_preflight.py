@@ -147,6 +147,35 @@ def run():
                 if not file.is_file():
                     say(f"OPENWRT_PATCH=FAIL missing {file}")
                     return 23
+                if file.name.startswith("760-01-net-dsa-qca8k"):
+                    # Capture pre-application state. No candidate mutation.
+                    header_lines = (linux / "include/net/dsa.h").read_text(
+                        encoding="utf-8").splitlines()
+                    for i, line in enumerate(header_lines):
+                        if "DSA_TAG_PROTO_VSC73XX_8021Q_VALUE" in line:
+                            low = max(0, i - 5)
+                            high = min(len(header_lines), i + 10)
+                            for n in range(low, high):
+                                say(f"DSA_PRE_76001_HEADER_LINE={n+1} {header_lines[n]}")
+                            break
+                    original = file.read_text(encoding="utf-8")
+                    for root_dir in PATCH_DIRS[:2]:
+                        for prior in ordered_patches(ROOT / root_dir):
+                            if prior == file:
+                                break
+                            body = prior.read_text(encoding="utf-8", errors="replace")
+                            if "include/net/dsa.h" in body:
+                                say(f"DSA_76001_POSSIBLE_PREDECESSOR={prior.relative_to(ROOT)}")
+                    for label, cmd in [
+                        ("GIT_APPLY", ["git", "-C", str(linux), "apply", "--check", "-p1", str(file)]),
+                        ("GNU_FUZZ0", ["patch", "-f", "-p1", "-d", str(linux),
+                                       "--batch", "--forward", "--fuzz=0",
+                                       "--dry-run", "--input", str(file)])]:
+                        trial = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT, check=False)
+                        say(f"DSA_76001_AFTER_BACKPORT_{label}={'PASS' if trial.returncode == 0 else 'FAIL'}")
+                        if trial.returncode:
+                            say(trial.stdout.decode("utf-8", errors="replace")[-1400:])
                 ok, msg = apply_patch(linux, file, strict=False)
                 if not ok:
                     say(f"OPENWRT_PATCH=FAIL {file.relative_to(ROOT)}")
