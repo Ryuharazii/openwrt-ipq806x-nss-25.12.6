@@ -609,3 +609,23 @@
 - 既存の `qca-nss-drv/patches/135-tunipip6-deallocation-unregister-check.patch` は `nss_unregister_tunipip6_if` の検証を dynamic IF type依存から `nss_is_dynamic_interface(if_num)` の範囲検査へ修正済み。そのため、clients側は元の `dealloc ACK -> unregister` の順序で既存driverと整合。
 - 141は重複対策であり、dealloc NACK/timeout時に先に登録解除すると動作中NSS IFのホスト登録が消える危険がある。前セッションの『修正2件』という評価は訂正。140のnetdev参照保持改修は維持。
 - **実ファームの生成・ARMビルド・RAM起動・有線IPv4/Wi-Fi/IPIP6のNSS速度実証は未実施。G1/G2未完・G3 FAIL。新CIビルドは起動しない。**
+
+## 2026-11-01 条件2/3再適用：起動からNSSまでの横断確認と回帰防止
+
+対象: WG2600HP / IPQ8064 / 25.12.6 / Linux6.12.112 / 統合隔離ブランチ。実機で確認済みの旧RAM版と、新しい統合候補のソースだけの証拠を明確に区別する。
+
+| 経路 | 証拠 | 現行候補の判定 |
+| --- | --- | --- |
+| 電源投入→Boot ROM→U-Boot→Linux | 既存台帳の旧RAM起動・ログイン・kernel 6.12.112記録 | **未確認**: 全電源投入・U-Bootログ、新統合イメージの起動記録なし |
+| Linux/DTS→NSS FW | 990-0001 NSS DTSパッチ、NSS driver FW hotplug/retail選択、旧RAMでNSS2コア起動 | **未確認**: 現行統合DTB、FW 11.4 ABI/ACK |
+| GMAC→DSA | DTS CPU0→GMAC1/eth0/RGMIIとCPU6→GMAC2/eth1/SGMII。現行内部tag qca-8021q、既存DSA ARMオブジェクト4件は旧コミットでコンパイル | **未確認**: 新タグ方式の実機、CPU0/6分離、PVID/MDIO失敗回復、1502 MTU |
+| WAN/LAN→IPv4 | board.d/02_network WAN→eth0、LAN→eth1。旧RAMのWAN DHCP、LAN→WAN ICMP/HTTPS、外向きMTU1460 | **未確認**: 新統合版LAN/WAN通信・NAT・ARP・MTU・隔離。旧RAM通信だけ実測PASS |
+| ECM→NSS IPv4 CREATE | 旧RAMでは lan1/br-lan/wan AE=-1、FAIL_RULE=-2、CREATE=0。active760-04/05でDSA conduitとVLANを表現。ECM ARM2オブジェクトは以前11パッチ時点の合格記録 | **未確認**: 新版AE番号、正しい方向のタグ、FW IPv4 CREATE/ACK/転送。旧RAM NSS加速FAIL |
+| Wi-Fi mac80211→NSS | DTS2無線、NSS/mac80211選択、source例外修正commit 60bc1ae4 | **未確認**: 修正後ARMコンパイル、NSS redirectの実通信・回帰 |
+| 固定IPIP6→動的IF→FW | driver135、clients140、重複141撤回、構成選択 | **未確認**: NSS tunnel CREATE/ACK、解放失敗、実機速度と統計 |
+
+**修正後回帰で見つけた確定不整合**: 直近ECM 760-06パッチはactive patchを11本から12本へ増やすが、scripts/wg2600hp_ecm_pinned_preflight.sh の固定検査は expected=11 としており、必ず ECM_PATCH_COUNT=FAIL を出す。以前のARM成功は760-06追加前の11件であり、760-06自身の正確なpinへのpatch適用やARM compileは行っていない。
+
+**安全隔離（本統合に追加しない）**: 760-06の全内容を backports/staging/760-06-ecm-ipv4-physical-nexthop-fallback-CANDIDATE.patch へ同一blob SHA 7e8b215d360a7cfee665ac2073856661cf3d8694 で保存（commit a630def1907d0a7253aa701b84c3916fcecfe3ce）、activeから撤回（commit d43bbba02e337c30978f00f437bb38766a9a4e33）。GitHubでactive11本、staging残存、2つのfull-build workflowが各改行1文字と確認。これは破綻したビルド入力の隔離であり加速実証でも新たなビルドPASSでもない。
+
+**確定ゲート**: G0=PASS（既存台帳確認のみ）、G1=未確認（現行候補の全起動経路）、G2=未確認（現行変更後の実機下流回帰）、G3=FAIL。実機RAM起動、FW IPv4 ACK、Wi-Fi、固定IPIP6の高速化は未確認。新ファームのビルド・フラッシュは開始しない。
