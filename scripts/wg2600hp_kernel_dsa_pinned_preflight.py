@@ -7,6 +7,7 @@ a kernel compile, boot test, or NSS hardware proof.
 """
 from pathlib import Path
 import hashlib
+import re
 import difflib
 import subprocess
 import sys
