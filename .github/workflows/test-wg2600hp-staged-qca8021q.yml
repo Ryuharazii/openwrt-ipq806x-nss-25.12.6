@@ -31,5 +31,7 @@ jobs:
           cat /tmp/old-test-results.txt
           test "$status" -eq 1
           grep -F "FAIL VLAN-aware routed" /tmp/old-test-results.txt
+      - name: Network audit fail-closed regression (mocked host only)
+        run: python3 -m unittest discover -s tests -p 'test_wg2600hp_net_audit_gate.py' -v
       - name: Explicit scope boundary
         run: echo "HOST-ONLY PASS does not establish ARM kernel build, boot, IPv4 or NSS offload."

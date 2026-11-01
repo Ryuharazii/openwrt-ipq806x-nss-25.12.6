@@ -393,3 +393,12 @@
 - **VLAN-aware bridgeは別条件**: 公開 `0052`は、VLAN-aware bridgeの複数VIDを扱う場合はconduit毎の`qca-dsa-nss` VLANノードが必要と明記。この場合、旧実ファームに`nss_register_vlan_if`等の5シンボルが無いことと`qca-dsa-nss`パッケージ未収録は**その公開方式の具体的な阻害要因**。この条件をデフォルト`br-lan`の障害と混同しない。参考: https://github.com/kuncy7/nss-packages/blob/HEAD/qca-nss-ecm/patches/0052-frontends-nss-accelerate-the-tag_8021q-ports-of-a-vlan-aware-bridge.patch
 - **静的対応確認**: GitHub実体の`760-04`・公開`0052`・`02_network`を照合し、ECMの物理conduit返却、VID/TPID構築、階層継続、別モジュール非参照、公開0052のVLAN-aware依存、既存wan→eth0/lan→eth1設定の**6項目一致**。これは実行確認ではない。なお起動後の`br-lan`が実際にVLAN-unawareか、既存タグルールのNSS FW解析、NSS CREATE/ACK、物理カウンター増分、双方向LAN/WAN分離は**未確認**。
 - **次の優先経路**: 既存ネットワーク設定・通常QCAタグを無断変更しない。成功版パッチが得られればデータパスを優先比較。それまで現行`wan/lan→conduit`の実機割当て・`br-lan` filtering・DSA-tagged ruleのFW対応を独立検証し、物理IF番号を無条件に強制するコードや`qca-dsa-nss`の別SoCコードの無条件移植は避ける。**G1/G2未完了、G3 FAIL。新ARMビルド・フラッシュなし**。
+
+## 2026-11-01 第22セッション：診断ゲートの既知MTUエラー見落としを隔離修正
+
+- 対象：WG2600HP / IPQ8064 / OpenWrt 25.12.6、監査ブランチ（修正起点 `2980d15ded083acdfa2d8dc52b9458a52166995f`）。通常作業ブランチ、FW、ネットワーク構成には変更しない。
+- 修正前の横断照合：既存G5実機証拠はNSS二コア→GMAC eth0/1→QCA8337 DSA→WAN DHCP→LAN経由IPv4成立を示す一方、`eth0/eth1: error -22 setting MTU to 1502` と `qca8k ... nonfatal error -34` を記録している。Boot ROM/U-Boot全ログ・MTUの後続効果・NSS CREATE/ACKは未確認。既存 `wg2600hp-net-audit` はこれらを `errors` に収集せず、`--inventory-only` が誤って成功し得た。
+- 修正：読取専用診断スクリプトの dmesg 検索条件に上記2種類を加える。新たなネットワーク操作、FW書込み、タグ/ECM変更はない。既存DSA probe FAIL検出を維持し、通常リンクログを故障として扱わない。
+- 事前の独立ホスト検査：旧・新正規表現を実ログと同型の6行で照合し、旧規則ではMTU 3例不検出、新規則では3例検出、DSA関連2例は両方検出、正常ログ1例は両方不検出。別途GNU grep -Eiでも新規則の5故障例検出・正常1例不検出を確認。これは**ログ判定のみ**の検証。
+- 回帰テスト：`tests/test_wg2600hp_net_audit_gate.py` にMTU -22両GMACおよびQCA8K -34の負例を追加。隔離host-only workflowへunittest実行ステップを追加。実行結果はGitHub Actionsのジョブログで別途確認し、確認前のPASS宣言は禁止。
+- 判定：本変更は検証診断の誤PASS対策であり、G1/G2の全経路回帰合格ではない。**G3 FAIL、ARM実ビルド・RAM実機・NSS高速化・固定IPIP6・Wi-Fi加速は未確認、フラッシュ禁止**。

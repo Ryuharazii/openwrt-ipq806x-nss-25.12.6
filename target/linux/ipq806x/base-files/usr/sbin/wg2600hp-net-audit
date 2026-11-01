@@ -31,7 +31,8 @@ for dev in eth0 eth1 wan lan1 lan2 lan3 lan4; do
 done
 
 echo '--- 2. Kernel network initialization failures ---'
-errors=$(dmesg | grep -Ei 'qca8k.*(probe.*failed|lacks the required)|nss-gmac.*probe.*failed|DSA.*(failed|error)' || :)
+# Include observed DSA/GMAC MTU errors in inventory failures; do not certify a faulty RAM boot.
+errors=$(dmesg | grep -Ei 'qca8k.*(probe.*failed|lacks the required|nonfatal error -34)|nss-gmac.*probe.*failed|DSA.*(failed|error)|eth[01].*error -22 setting MTU to 1502' || :)
 if [ -n "$errors" ]; then
     printf '%s\n' "$errors"
     echo 'FAIL kernel network initialization errors observed'

@@ -65,6 +65,22 @@ class AuditGateTest(unittest.TestCase):
         r = self.run_script()
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
+    def test_known_mtu_errors_fail_inventory_only(self):
+        # Actual 2026-10-31 RAM-boot error classes must not yield inventory PASS.
+        for dev in ('eth0', 'eth1'):
+            with self.subTest(dev=dev):
+                r = self.run_script('--inventory-only',
+                                    log=f'{dev}: error -22 setting MTU to 1502')
+                self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+                self.assertIn('RESULT=INVENTORY_FAIL NSS_OFFLOAD=UNVERIFIED',
+                              r.stdout)
+
+    def test_qca8k_nonfatal_error_is_not_silenced(self):
+        r = self.run_script('--inventory-only',
+                            log='qca8k switch: nonfatal error -34')
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('RESULT=INVENTORY_FAIL NSS_OFFLOAD=UNVERIFIED', r.stdout)
+
     def test_unknown_option_refused(self):
         r = self.run_script('--accept-false-pass')
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
