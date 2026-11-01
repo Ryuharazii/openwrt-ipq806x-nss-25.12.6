@@ -360,3 +360,11 @@
 - **適用・静的確認**: GitHub実体の`760-01`177行から新規taggerを復元し、`760-10`1ハンク→`760-11`1ハンクを削除行・文脈・行番号一致で順番どおり適用可能と照合。復元後212行。対象関数条件・予約VID拒否・RCU取得・既存VLAN-unaware動作維持・760-02 PVID書込み存在・変更ファイルの限定の**静的9/9項目一致**を確認。これはARMの実コンパイルPASSではない。
 - **残る未解決条件**: VLAN-awareかつmarked無タグのフレームを拒否するため送出保証はない。802.1ad等は拒否。PVID以外の非タグ通過、bridge VLANのtagged/untagged、CPU0/6・QCA8K MDIO/VTU操作、ECM pinned 760-04/05からNSS CREATE/ACKまでの動作は未証明。NSS VLAN機能のビルド依存も未解決。**通常ブランチにもWG2600HP用ビルド/設定にも新規統合なし、ユーザー用VLAN追加なし**。
 - **合格判定**: G1/G2全経路検証未完了、G3 FAIL継続。前回の7 PASS/1 FAILは760-10に対する実テストではなくJS静的モデル。今回の760-11はGitHub保存・パッチ静的適用照合・9静的条件のみで、C実行テスト・ARMビルド・電源投入からの起動・RAM実機試験・NSS加速は**未実施**。本統合・書込み禁止。
+
+## 2026-11-01 760-11動的ホストテスト修正と予約タグ検証
+
+- **前回の9/9静的確認の見落としを訂正**: 旧`760-11`はVLAN-aware bridgeでhwaccel tagが`0x88a8`（802.1ad）でもそのまま通過、embedded 802.1QでDSA予約VIDを含んでも通過していた。これは本来ブロックすべき境界ケース。隔離ホストCモデル（実NSS/実DSA未使用）で**旧版12件中10 PASS・2 FAIL**、G3 FAILを保持。
+- **修正済み隔離パッチ**: `backports/staging/760-11-net-dsa-qca8021q-vlan-aware-vid-guard-6.12-CANDIDATE.patch`を**同一ファイルとして更新**（commit `08a2907eef706ed8b8cec8d89d80439bb0b9a814`、blob `0b553fb14b8e9e704c02af79b239af240798fe79`）。hwaccel tagの`skb->vlan_proto == htons(ETH_P_8021Q)`を要求し、embedded tagはLinux6.12.112 `__vlan_get_tag()`取得後`VID & VLAN_VID_MASK`でDSA予約VID拒否、8021adの誤スタッキングを拒否。Linux6.12.112 `include/linux/if_vlan.h`で`__vlan_get_tag`のAPIと返却契約を確認。ユーザー向けVLAN設定やWAN/LAN変更なし。
+- **再実行の種類・結果**: 存在が確認された作業領域の`/mnt/data/wg2600hp_qca8021q_guard_host.c`（SHA256 `b4b03c8454e31b5805b3aee88d5cbf34674415dfa2a6756f2d89d72b725a8c0a`）で`gcc 14.2.0 -std=c11 -Wall -Wextra -Werror`の**x86_64ホスト模擬コンパイル成功**、12条件すべて期待値一致、exit0。結果テキストSHA256 `9cb5823d1c1a47be4dcb226cece20849e269de55ec677139e69d88c326272096`。テストCはGitHubに追加した実カーネルソースではなく**パッチの分岐条件を人手で転記した模擬モデル**。したがってモデル12/12はカーネルビルド・実機通信PASSではない。
+- **実パッチ適用整合**: GitHub上の`760-01`復元177行に`760-10`1ハンク(`-18/+24`)を照合適用し183行、続けて更新後`760-11`1ハンク(`-12/+49`)を照合適用して220行。文脈・行番号一致、予約VID拒否・8021ad拒否・PVID経路・ECM向けbridge VID維持を含む静的6条件一致。ソース変更はtagger1ファイルのみ。**Linux6.12.112の実カーネルコンパイル・ARM実ビルドは未実施**。
+- **本流継続条件**: 760系は引き続き**本統合しない**。DSA起動→WAN/LAN→ECM pinnedの実デバイス階層→NSS CREATE/ACK→FWでのQCAタグ/802.1Q解釈、およびWi-Fi/固定IPIP6への影響は未証明。以前の`760-10`回帰テスト7 PASS / 1 FAILと、今回の`760-11`修正後12/12は**異なるコード/検証対象**で、760-10単独の問題が解消したと誤解しない。G1/G2未完了、G3 FAIL、書込み禁止継続。
