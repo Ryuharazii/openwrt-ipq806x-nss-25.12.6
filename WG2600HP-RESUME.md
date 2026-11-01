@@ -105,3 +105,14 @@
 - **ECM stagingの明確な制限**：`backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch`は`!dp->ds->tag_8021q_ctx`ならconduit取得をNULLで終了するため、**現行QCAタガーのままではこの候補を適用してもDSA user→NSS IF解決問題を修正できない**。本統合しない。既存RAM実測の`AE IF=-1`、`FAIL_RULE=-2`、NSS CREATE=0を優先する。
 - **新規外部情報との境界**：IPQ5018/QCA8337の公開事例ではQCAの2BヘッダをNSSが解析できない報告あり。ただしSoC・DPが異なり**WG2600HP/IPQ8064の実証ではない**。QCAヘッダとNSS FW処理の互換性、LAN/WAN独立性、MTU、NSSルール生成を機種固有の根拠で横断確認する必要がある。
 - **このセッションの確認の種類**：GitHub実ファイル5件とLinux v6.12.112のDSAソース・公的文書の照合、出現条件7件の静的チェックのみ。**修正/ARMビルド/QEMUで電源投入から起動完了/実機RAM起動/通信・オフロード実測は未実施**。G1/G2未確認、G3 FAILを維持。次はECM pinnedの階層構築とNSS GMAC IFへ対応づける経路を、QCAタグ互換性と一体で照合する。
+
+## 2026-11-01 NSS物理IF番号とQCAフレームを分けた横断監査
+
+- **ソース上で確認した現状**: WG2600HPのDTS CPU0→GMAC1 / CPU6→GMAC2。 `base-files/etc/board.d/02_network` はWAN→eth0、LAN1～4→eth1を設定。現行Linux 6.12.112 `net/dsa/tag_qca.c` はEthernetフレームに独自QCAヘッダを挿入・除去し、`include/linux/dsa/tag_qca.h` の `QCA_HDR_LEN=2`。QCA8K標準taggerの現状は変更しない。
+- **NSS IF解決の参照実装（同系列だが現行pinと同一性は未確認）**: 旧IPQ806x公開実装 `Getnear/R7800` の `package/qca-nss-drv/src/nss_cmn.c` `nss_cmn_get_interface_number_by_dev` は`nss_top_main.subsys_dp_register[i].ndev`と要求`net_device*`の**ポインタ一致**でIF番号を返し、一致しなければ-1。`src/nss_data_plane.c` は`nss_gmac_get_netdev_by_macid(if_num)`から物理GMACのnetdevを取得し、`subsys_dp_register[if_num].ndev = netdev`へ登録する。リンク: https://github.com/Getnear/R7800/blob/508b1eb1eff3a92f6ecf3c2c5a08ffa82065ce61/package/qca-nss-drv/src/nss_cmn.c 、https://github.com/Getnear/R7800/blob/508b1eb1eff3a92f6ecf3c2c5a08ffa82065ce61/package/qca-nss-drv/src/nss_data_plane.c 。
+- **現行実装との相違の留保**: 作業版 `package/qca-nss/qca-nss-drv/Makefile` は`PKG_SOURCE_VERSION:=3cfb9f43`、GMACは`171767947467662f2407d0cfff26dfb136c3fb4a`。**この正確なpinのソース実体はこの監査で取得できていない**ので上記参照実装を「WG2600HPで実行されたコード」とは断定しない。
+- **実機結果への整合性**: 既存RAM版`ecm_dump.sh`で`lan1/br-lan/wan AE IF=-1`、`FAIL_RULE=-2`、`NSS IPv4 CREATE=0`。ECM pinned `9acdcb05` がNSS IF番号を要求する直接阻害との整合は強いが、IF登録先と各フロー階層を**実機と現行pinソースで独立確認すること**。手当たり次第の番号1/2への置換は禁止。
+- **第2の独立した障害仮説**: DSAの標準QCAタグ（2バイト）がNSS内部のL3解釈に対応するか未実証。他SoCの`kuncy7/openwrt-nss-edma/README.ipq50xx.md`では不対応の報告があるが、**IPQ5018の記述であり、IPQ8064の検証結果ではない**。ECM mappingを解決してもQCAタグでNSSパケット処理が成立するとは断定できない。
+- **既に存在するGMAC/DSA対応**: `package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch`が`netdev->dev.of_node = pdev->dev.of_node`を設定する。OpenWrt 711-03には`.port_change_conduit`。現行の`wan→eth0`/`lan→eth1`設定も存在するため、これらを無視して新たな別構成に置き換えない。
+- **次の横断確認対象**: 現行pinの`nss_cmn_get_interface_number_by_dev`とデータプレーン登録、ECM hierarchical iface resolution、QCAヘッダのNSSファームウェア側解釈・`eth_rx_unknown_l3_protocol`実カウンター、CPU0/6のL2分離、IPv4/固定IPIP6/Wi-Fiの相互影響。追加VLAN設定を要求しない。障害が2つある可能性を踏まえ、局所変更だけでPASSにしない。
+- **判定**: 今回はGitHub作業版/公式Linux6.12.112/公開NSS類似実装のソース横断照合のみ。現行pinソース直接比較・QEMU/電源投入→起動完了・ARMコンパイル・新RAM実機試験・NSS高速化の検証は未実施。G1/G2未完了、G3 FAIL。**新パッチ統合・ビルド・フラッシュなし**。
