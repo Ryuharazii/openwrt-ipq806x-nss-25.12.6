@@ -442,3 +442,10 @@
 - **FAIL**：次の`760-01`で`include/net/dsa.h`2ハンク・`net/dsa/Makefile`1ハンクが不一致、CI job失敗。Kconfigと新tagger作成だけでは合格しない。旧host static PASSを全ソース適用PASSに使わない。
 - 直接取得した元ソース7ファイルに対して旧ハンク文字列は全件存在するため、無条件パッチ書換えは保留。前段711/712後のブロブ・ハンク一致と760-01単独dry-runの診断を追加し、失敗原因を分離する。Linux全generic patch・target patchを適用したわけではない。
 - G1/G2未完・**G3 FAIL**。通常作業ブランチ/設定は変更なし。ファームビルド・フラッシュなし。
+
+## 2026-11-01 第22セッション：760-01の実適用FAILを独立再現（原因未確定）
+
+- 検証対象：`e246fb3744695520631a9613b8e7f7540aa394f5`、WG2600HP(IPQ8064)、Linux`gregkh/linux v6.12.112`の7実ソースgit blob一致。`[GitHub Actions #41273566112](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41273566112)`は**failure**。ECM固定pin＋OpenWrt9本＋隔離760-04/05は再度適用PASS（別系列の合格として保持）。
+- 同ジョブで`760-01`を**711/712適用前の素のLinux6.12.112に対してdry-run**しても`DSA_76001_STOCK_DRY_RUN=FAIL`、`include/net/dsa.h`2ハンクと`net/dsa/Makefile`1ハンクを拒否。711-01/02/03・712の4本は再びPASS、その後の`760-01`も同じ3ハンクで失敗。
+- CIで直前の`include/net/dsa.h` git blob=`a1f730d9f01b82f7f04ca365d1a6b22a96bd3521`、`net/dsa/Makefile`=`555c07cfeb71285b1904bb5ffa0ec8702c1267f8`（元ソースそのもの、上流から変化なし）を確認。`760-01`の各旧ハンク7行を文字列として直接比較した結果、**3ハンクとも `exact_source_match=True`**。すなわち単に「上流コードに旧テキストが無い」とは説明できない。GNU patchのハンク認識・周辺文脈・patchファイルの整合性を次に検査し、根拠が揃うまで見かけの文脈修正をしない。
+- この結果は**現CIの選択12パッチゲートFAIL**を意味し、全OpenWrt patch適用後の合否、カーネル起動、実機通信への帰結は未確認。修正版760は本統合しない。通常作業ブランチと既存LAN/WAN/VLAN設定は不変更。**G1/G2未完、G3 FAIL、ファームビルド・書込み禁止**。
