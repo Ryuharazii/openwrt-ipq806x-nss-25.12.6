@@ -9,6 +9,7 @@ on:
     paths:
       - .github/workflows/wg2600hp-nss-real-build-once-20261101.yml
       - tests/test_wg2600hp_cross_audit.py
+      - scripts/wg2600hp_cross_audit.py
 
 concurrency:
   group: wg2600hp-nss-${{ github.ref }}
