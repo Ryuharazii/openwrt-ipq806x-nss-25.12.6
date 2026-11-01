@@ -80,6 +80,14 @@ jobs:
           sed -i 's/^PKG_MIRROR_HASH:=21f8a0ce6672f9dfae9eca6490b19e49cfc51f6fdc5ba48db28c20a92af81822$/PKG_MIRROR_HASH:=91f2189ee0410bd9cd3bd85f4fd70ddc7799f85e27d2a8246e0b5835b2b97315/' "$p"
           grep -Fxq 'PKG_MIRROR_HASH:=91f2189ee0410bd9cd3bd85f4fd70ddc7799f85e27d2a8246e0b5835b2b97315' "$p"
           printf 'STEP2_GMAC_ARCHIVE_PIN\tVERIFIED_FROM_RUN_41310034434\n' >> build-gates.tsv
+          p=package/qca-nss/qca-nss-drv/Makefile
+          grep -Fxq 'PKG_SOURCE_VERSION:=3cfb9f43' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=37d268b4712db049df3780ce298abe0456f6478a9ec2504eb303a6f10e03c818' "$p"
+          # Failed run 41318027195 independently re-created this archive
+          # from upstream Git revision 3cfb9f43. Two fetched copies matched.
+          sed -i 's/^PKG_MIRROR_HASH:=37d268b4712db049df3780ce298abe0456f6478a9ec2504eb303a6f10e03c818$/PKG_MIRROR_HASH:=5dd11f3cb619a5967f214785263a4ddfaa1bede817b8859f512722b8663262df/' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=5dd11f3cb619a5967f214785263a4ddfaa1bede817b8859f512722b8663262df' "$p"
+          printf 'STEP2_DRV_ARCHIVE_PIN\tVERIFIED_FROM_RUN_41318027195\n' >> build-gates.tsv
 
       - name: Configure WG2600HP only
         run: |
