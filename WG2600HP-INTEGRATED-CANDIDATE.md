@@ -94,3 +94,14 @@ and otherwise delivers the packet using `netif_receive_skb()`.
 A regression check was added. This fixes a source-level Wi-Fi
 compatibility hazard, **not** full wired/Wi-Fi/tunnel NSS integration,
 and is not a tested kernel image or a reason to auto-build.
+
+## WG2600HP-specific NSS firmware header/driver ABI revision correction
+
+The checked-in NSS firmware bundle's `nss_fw_version.h` declares major=11,
+minor=4. Previously `qca-nss-drv/Makefile` unconditionally overwrote this
+header to minor=2 for ipq806x, a source-level revision mismatch.
+WG2600HP alone now compiles the driver with NSS minor=4, matching the
+bundled firmware **header**. Other ipq806x device builds retain minor=2.
+The exact binary firmware's embedded revision/ABI and its behavior with
+the pinned NSS driver are not independently verified. This is a candidate
+source correction only. No auto build or flash has been initiated.

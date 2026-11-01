@@ -250,7 +250,13 @@ ifndef CONFIG_NSS_DRV_WIFI_ENABLE
    DRV_MAKE_OPTS += NSS_DRV_WIFI_ENABLE=n
 endif
 
-ifeq ($(CONFIG_TARGET_BOARD), "ipq806x")
+# The WG2600HP NSS firmware bundle declares 11.4 in nss_fw_version.h.
+# Keep the driver compile-time firmware ABI revision aligned with that header.
+# Preserve the prior 11.2 setting for other ipq806x devices until verified.
+ifeq ($(CONFIG_TARGET_ipq806x_generic_DEVICE_nec_wg2600hp),y)
+    TARGET_NSS_MINOR_VERSION=4
+    DRV_MAKE_OPTS+= TARGET_NSS_MINOR_VERSION=$(TARGET_NSS_MINOR_VERSION)
+else ifeq ($(CONFIG_TARGET_BOARD), "ipq806x")
     TARGET_NSS_MINOR_VERSION=2
     DRV_MAKE_OPTS+= TARGET_NSS_MINOR_VERSION=$(TARGET_NSS_MINOR_VERSION)
 endif
