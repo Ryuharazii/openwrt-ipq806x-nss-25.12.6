@@ -277,3 +277,9 @@
 - **実際に再取得したLinux v6.12.112ソースで確認**: `qca8k.h`、`qca8k-8xxx.c`、`qca8k-common.c` への既存 `711-01`（3/3）、`711-02`（1/1）、`711-03`（2/2）、`712`（3/3）に続いて、修正版 `760-02`（28/28）の **37/37 unified-diff文脈が順次一致**（ソースをメモリ上で更新した静的検証）。GitHub新blob `1428da306d27b101a9f40733c99e8cba72a8b9fd` を読み戻し一致。
 - `net/dsa/tag_8021q.c` の Linux v6.12.112 基準に `760-03` と `760-06` を順次適用する文脈検証は **2/2一致**。合計39/39パッチ文脈一致。ただし `760-06` の未初期化portへの teardown／部分失敗時のhardware rollbackに問題がないかは未解決。
 - **未確認（G2/G3）**: 実コンパイル、MDIO書込失敗時の全ポート回復、2 CPUポートのフレーム分離、pinned ECM `760-04/05` のOpenWrt適用順、Wi-Fi NSS/固定IPIP6/NSS IPv4実機オフロード。**G3 FAIL・新規ファームビルドは実行しない。**
+
+## 2026-11-01 実DTB機能宣言の直接照合
+
+- 同じZIP内の ARM uImage バイト位置 8,819,232、FDT version 17、DTB全長 36,855 bytes の実FDTを解析（ヘッダーの長さ・文字列表・構造トークンを照合）。
+- `/soc/nss-common` ノードが存在。NSS0 `/soc/nss@40000000` に `qcom,tunipip6-enabled`、`qcom,wlanredirect-enabled`、`qcom,wlan-dataplane-offload-enabled` の**各ブールプロパティ**が存在する。NSS1は別の機能群を担当。該当プロパティの `_` / `-` 誤記はこの実DTBでは検出されない。
+- 以上は**旧ビルドの設定・バイナリの存在確認のみ**。実機の固定IPIP6/Wi-FiのNSSオフロード成功は未実証であり、完成ではない。実機NSS rule/offloadカウンタ増分までG6未確認を維持。
