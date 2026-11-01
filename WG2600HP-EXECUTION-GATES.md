@@ -429,3 +429,9 @@
 - 実際に Codelinaro から `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa` をfetchし、`git rev-parse HEAD` が完全一致：`ECM_PIN=VERIFIED`。一時チェックアウトへ`patch --batch --forward --fuzz=0 -p1`でOpenWrt既存`100/115/200/210/215/220/300/400/401`の9本、および`760-04/760-05`の2本を**この順番で適用して全11本PASS**、終了行`ECM_STAGED_APPLY=PASS`。各パッチSHA256がCIログに保存済み。これは公開類似ミラーの推測ではなく、**固定版への実適用検査**。
 - 同一ジョブでtagger模擬12/12、旧760-10負例検出、ネット監査8/8、ECM VLAN-awareガード6/6もPASS。
 - **適用PASSの範囲**は固定ECMソースへの差分反映、コンテキスト一致に限る。Cコンパイル/ARMリンク、Linux6.12.112へのDSA修正の実コンパイル、FW NSS CREATE/ACK、電源投入→RAM起動、IPv4 NSS実加速、Wi-Fi、固定IPIP6の実測はいずれも未確認。G1/G2未完、**G3 FAIL、ファームビルド・書込み不可**。
+
+## 2026-11-01 第22セッション：Linux6.12.112の実ソースに対するDSA隔離パッチ検査を追加
+
+- 対象WG2600HP/IPQ8064、上流`gregkh/linux`の`v6.12.112`を基準とする。`include/net/dsa.h`、`net/dsa/{Kconfig,Makefile,tag_8021q.c}`、`qca8k.{h}`、`qca8k-{8xxx,common}.c`の**7ソースGit blob SHA**をAPIで実確認。新規`scripts/wg2600hp_kernel_dsa_pinned_preflight.py`が7実ファイルを取得しGit SHA1(blob)で一致確認後、作業ツリーの既存711-01/02/03・712、隔離760-01/02/03/06/08/09/10/11の**12パッチを順番に一時領域で適用**する。欠落、不一致、文脈不整合、ネットワーク取得失敗は即失敗/未確認扱い。
+- 既存の隔離host CIに限定し、実ソースへの`patch -p1 --fuzz=0`試験でありARMファームのビルドではない。結果は新たなGitHub Actions jobログ確認後に判定する。
+- **範囲の限定**：これは上流素のLinuxと選択12パッチのみ。OpenWrtのほかのgeneric pending・ipq806x target patch全体を先に適用した環境、ARMコンパイル、デバイス電源投入、RAM実機、DSA VLANハード、NSS CREATE/ACKの合格を意味しない。通常作業ブランチとWAN/LAN設定・ユーザーVLANを変更しない。G1/G2未完、**G3 FAIL、FWビルド不可**。
