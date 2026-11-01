@@ -402,3 +402,11 @@
 - 事前の独立ホスト検査：旧・新正規表現を実ログと同型の6行で照合し、旧規則ではMTU 3例不検出、新規則では3例検出、DSA関連2例は両方検出、正常ログ1例は両方不検出。別途GNU grep -Eiでも新規則の5故障例検出・正常1例不検出を確認。これは**ログ判定のみ**の検証。
 - 回帰テスト：`tests/test_wg2600hp_net_audit_gate.py` にMTU -22両GMACおよびQCA8K -34の負例を追加。隔離host-only workflowへunittest実行ステップを追加。実行結果はGitHub Actionsのジョブログで別途確認し、確認前のPASS宣言は禁止。
 - 判定：本変更は検証診断の誤PASS対策であり、G1/G2の全経路回帰合格ではない。**G3 FAIL、ARM実ビルド・RAM実機・NSS高速化・固定IPIP6・Wi-Fi加速は未確認、フラッシュ禁止**。
+
+## 2026-11-01 第22セッション：ECM 760-04 の VLAN-aware 異なるVIDによる誤加速を隔離防止
+
+- 修正前横断根拠：既存RAM版では Boot→NSSコア→GMAC→DSA→WAN DHCP→LAN IPv4 が成立した一方、ECMのLAN1/BR-LAN/WAN AE IF=-1、FAIL_RULE=-2、NSS CREATE=0。起動全ログ、NSSタグ転送・ACK、Wi-Fi/IPIP6は未確認。QCA8K 760-01/02/03 + 760-10/11、ECM 760-04/05、board.d のWAN→CPU0/eth0・LAN→CPU6/eth1、収録済みNSS VLAN API欠落を横断照合。
+- **具体的不一致**：旧隔離ECM `760-04` の `ecm_interface_dsa_8021q_conduit()` は、VLAN-aware bridge でも `dp->bridge->tx_fwd_offload` だけで `dsa_tag_8021q_bridge_vid()` をルールVIDに選び得た。一方、隔離tagger `760-11` は VLAN-aware の実VLAN VID/PVIDを送出し、Linux6.12 DSA仕様もブリッジの実VIDで処理する。公開 `kuncy7/nss-packages` の `0052` はこの同種不一致を説明し、per-flow VID とFW VLANノードによる別経路を追加。IPQ5018測定結果はWG2600HP実機証拠と混同しない。
+- **隔離候補だけをfail-closed修正**：`760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch` の helper で bridge device 取得失敗か `br_vlan_enabled(br)` の場合に `NULL` を返してDSAを仮想VLANとして扱わない。Linux `linux/if_bridge.h` を明示追加。既存VLAN-unaware bridge/standalone/WAN・LAN構成とQCA通常運用を変更しない。VLAN-awareのNSS加速を**許可する修正ではなく禁止する安全策**。
+- host-only 回帰：`tests/test_wg2600hp_ecm_8021q_guard.py` はガード順序、bridge取得、tagger実VID、CPU0/6分離を検査し、guardを除外する負例2件が不合格になるか確認。`.github/workflows/test-wg2600hp-staged-qca8021q.yml` のホスト試験に追加。unified-diffの7ハンク旧/新行数一致をGitHub保存前に確認。**CIジョブログ確認前にPASSとはしない**。
+- 未完：pinned ECM実ソース+OpenWrt400/401適用後へのdry-run/ARM compile、実DSA/FDB/PVID VLAN HW、IPv4 NSS CREATE/ACKとタグ処理、Boot ROM→U-Bootのログ、Wi-Fi、固定IPIP6の全回帰。公開 `0052` をIPQ8064へ移植したわけではない。**G1/G2未完了、G3 FAIL、新規FWビルド・書込み禁止**。

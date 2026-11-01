@@ -11,7 +11,7 @@ NOT YET COMPILE VERIFIED.
 ---
 --- a/ecm_interface.c
 +++ b/ecm_interface.c
-@@ -74,10 +74,14 @@
+@@ -74,10 +74,15 @@
  #include <linux/netfilter_ipv6/ip6_tables.h>
  #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
  #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
@@ -24,13 +24,14 @@ NOT YET COMPILE VERIFIED.
 +#include <linux/if_vlan.h>
 +#endif
 +#if IS_ENABLED(CONFIG_NET_DSA)
++#include <linux/if_bridge.h>
 +#include <linux/dsa/8021q.h>
 +#include <net/dsa.h>
 +#endif
  #ifdef ECM_INTERFACE_PPP_ENABLE
  #include <linux/if_pppox.h>
  #ifdef ECM_INTERFACE_L2TPV2_ENABLE
-@@ -304,14 +308,59 @@
+@@ -304,14 +309,69 @@
  }
  EXPORT_SYMBOL(ecm_interface_get_and_hold_dev_master);
  
@@ -56,6 +57,16 @@ NOT YET COMPILE VERIFIED.
 +	if (IS_ERR_OR_NULL(dp) || !dp->ds || !dp->ds->tag_8021q_ctx ||
 +	    !dp->cpu_dp || !dp->cpu_dp->conduit)
 +		return NULL;
++
++	/* A VLAN-aware bridge carries its own per-flow VID, not the
++	 * tag_8021q bridge VID. Without per-flow VLAN/NSS node lookup,
++	 * retain this path on the host instead of emitting a wrong rule.
++	 */
++	if (dp->bridge) {
++		struct net_device *br = dsa_port_bridge_dev_get(dp);
++		if (!br || br_vlan_enabled(br))
++			return NULL;
++	}
 +
 +	if (vid) {
 +		if (dp->bridge && dp->bridge->tx_fwd_offload)
@@ -98,7 +109,7 @@ NOT YET COMPILE VERIFIED.
  
  /*
   * ecm_interface_dev_find_by_local_addr_ipv4()
-@@ -3114,14 +3163,22 @@
+@@ -3114,14 +3174,22 @@
  		/*
  		 * VLAN?
  		 */
@@ -125,7 +136,7 @@ NOT YET COMPILE VERIFIED.
  			DEBUG_TRACE("%px: Net device: %px is VLAN, mac: %pM, vlan_id: %x vlan_tpid: %x\n",
  					feci, dev, type_info.vlan.address, type_info.vlan.vlan_tag, type_info.vlan.vlan_tpid);
  
-@@ -3989,7 +4046,7 @@
+@@ -3989,7 +4057,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -134,7 +145,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -5213,7 +5270,7 @@
+@@ -5213,7 +5281,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -143,7 +154,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -6157,7 +6214,7 @@
+@@ -6157,7 +6225,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -152,7 +163,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -6818,7 +6875,8 @@
+@@ -6818,7 +6886,8 @@
  			stats.tx_packets = tx_packets;
  			stats.tx_bytes = tx_bytes;
  			DEBUG_INFO("vlan call to update status:rx pkt:%u tx pkt:%u", rx_packets, tx_packets);
