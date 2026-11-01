@@ -1,0 +1,17 @@
+name: WG2600HP isolated assembly gate (no firmware build)
+on:
+  push:
+    branches: [wg2600hp-nss-integrated-candidate-20261101]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  assembly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify actual build source patch and configuration assembly
+        run: python3 scripts/wg2600hp_integrated_candidate_guard.py
+      - name: Scope reminder
+        run: echo "SOURCE ASSEMBLY CHECK ONLY. No ARM build, RAM boot, or NSS ACK."

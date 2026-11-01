@@ -1,0 +1,37 @@
+From: WG2600HP dual-CPU backport staging
+Subject: [PATCH 3/3] net: dsa: tag_8021q: restrict VLAN CPU membership to assigned conduit
+
+WG2600HP QCA8337: user port 1 -> CPU0 (WAN), ports 2-5 -> CPU6 (LAN).
+Both registration and deletion use this same predicate. Keep DSA transit port handling.
+Requires separate QCA8K tag-protocol driver integration before use.
+Do not deploy without real RAM-boot and NSS regression checks.
+
+---
+--- a/net/dsa/tag_8021q.c
++++ b/net/dsa/tag_8021q.c
+@@ -207,12 +207,19 @@
+ 	return 0;
+ }
+ 
+-static bool
+-dsa_port_tag_8021q_vlan_match(struct dsa_port *dp,
+-			      struct dsa_notifier_tag_8021q_vlan_info *info)
+-{
+-	return dsa_port_is_dsa(dp) || dsa_port_is_cpu(dp) || dp == info->dp;
+-}
++static bool
++dsa_port_tag_8021q_vlan_match(struct dsa_port *dp,
++			      struct dsa_notifier_tag_8021q_vlan_info *info)
++{
++	/* Only the conduit CPU port belonging to this user port may carry
++	 * its VLAN. Registering it on both CPU ports leaks traffic across
++	 * the split WAN (port 0) and LAN (port 6) CPU paths.
++	 */
++	if (dsa_port_is_cpu(dp))
++		return dp == info->dp->cpu_dp;
++
++	return dsa_port_is_dsa(dp) || dp == info->dp;
++}
+ 
+ int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
+ 				  struct dsa_notifier_tag_8021q_vlan_info *info)

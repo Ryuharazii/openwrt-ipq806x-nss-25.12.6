@@ -1,0 +1,175 @@
+From: WG2600HP ECM pinned-source backport staging
+Subject: [PATCH] ecm: stage DSA 802.1Q conduit to NSS VLAN hierarchy mapping
+
+Pinned ECM: 9acdcb05c04ae177a79c4c34cef0487fbcedbfaa
+Linux: 6.12.112. Source is the exact pinned version, before OpenWrt
+400/401 patches. This is isolated candidate only; do not enable or flash
+until all ECM frontend and kernel dual-CPU integration are validated.
+Reference: kuncy7/nss-packages 0051 (for a newer ECM).
+NOT YET COMPILE VERIFIED.
+
+---
+--- a/ecm_interface.c
++++ b/ecm_interface.c
+@@ -74,10 +74,15 @@
+ #include <linux/netfilter_ipv6/ip6_tables.h>
+ #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
+ #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
+-#ifdef ECM_INTERFACE_VLAN_ENABLE
+-#include <linux/../../net/8021q/vlan.h>
+-#include <linux/if_vlan.h>
+-#endif
++#ifdef ECM_INTERFACE_VLAN_ENABLE
++#include <linux/../../net/8021q/vlan.h>
++#include <linux/if_vlan.h>
++#endif
++#if IS_ENABLED(CONFIG_NET_DSA)
++#include <linux/if_bridge.h>
++#include <linux/dsa/8021q.h>
++#include <net/dsa.h>
++#endif
+ #ifdef ECM_INTERFACE_PPP_ENABLE
+ #include <linux/if_pppox.h>
+ #ifdef ECM_INTERFACE_L2TPV2_ENABLE
+@@ -304,14 +309,69 @@
+ }
+ EXPORT_SYMBOL(ecm_interface_get_and_hold_dev_master);
+ 
+-/*
+- * ecm_interface_vlan_real_dev()
+- *	Return immediate VLAN net device or Physical device pointer
+- */
+-static inline struct net_device *ecm_interface_vlan_real_dev(struct net_device *vlan_dev)
+-{
+-	return vlan_dev_next_dev(vlan_dev);
+-}
++#ifdef ECM_INTERFACE_VLAN_ENABLE
++#if IS_ENABLED(CONFIG_NET_DSA)
++/* Return the physical conduit only for ports using the 802.1Q DSA tagger. */
++static struct net_device *ecm_interface_dsa_8021q_conduit(struct net_device *dev, uint16_t *vid)
++{
++	struct dsa_port *dp;
++
++	if (!dsa_user_dev_check(dev))
++		return NULL;
++
++	dp = dsa_port_from_netdev(dev);
++	if (IS_ERR_OR_NULL(dp) || !dp->ds || !dp->ds->tag_8021q_ctx ||
++	    !dp->cpu_dp || !dp->cpu_dp->conduit)
++		return NULL;
++
++	/* A VLAN-aware bridge carries its own per-flow VID, not the
++	 * tag_8021q bridge VID. Without per-flow VLAN/NSS node lookup,
++	 * retain this path on the host instead of emitting a wrong rule.
++	 */
++	if (dp->bridge) {
++		struct net_device *br = dsa_port_bridge_dev_get(dp);
++		if (!br || br_vlan_enabled(br))
++			return NULL;
++	}
++
++	if (vid) {
++		if (dp->bridge && dp->bridge->tx_fwd_offload)
++			*vid = dsa_tag_8021q_bridge_vid(dsa_port_bridge_num_get(dp));
++		else
++			*vid = dsa_tag_8021q_standalone_vid(dp);
++	}
++	return dp->cpu_dp->conduit;
++}
++#else
++static inline struct net_device *ecm_interface_dsa_8021q_conduit(struct net_device *dev, uint16_t *vid)
++{
++	return NULL;
++}
++#endif
++
++static inline bool ecm_interface_is_vlan_dev(struct net_device *dev)
++{
++	return is_vlan_dev(dev) || ecm_interface_dsa_8021q_conduit(dev, NULL);
++}
++#endif
++
++/*
++ * ecm_interface_vlan_real_dev()
++ *	Return immediate VLAN net device or Physical device pointer
++ */
++static inline struct net_device *ecm_interface_vlan_real_dev(struct net_device *vlan_dev)
++{
++#ifdef ECM_INTERFACE_VLAN_ENABLE
++	if (is_vlan_dev(vlan_dev)) {
++		struct net_device *real = vlan_dev_next_dev(vlan_dev);
++		struct net_device *conduit = ecm_interface_dsa_8021q_conduit(real, NULL);
++		return conduit ? conduit : real;
++	}
++	return ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);
++#else
++	return vlan_dev_next_dev(vlan_dev);
++#endif
++}
+ 
+ /*
+  * ecm_interface_dev_find_by_local_addr_ipv4()
+@@ -3114,14 +3174,22 @@
+ 		/*
+ 		 * VLAN?
+ 		 */
+-		if (is_vlan_dev(dev)) {
++		if (ecm_interface_is_vlan_dev(dev)) {
+ 			/*
+ 			 * VLAN master
+ 			 * GGG No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
+ 			 */
+-			ether_addr_copy(type_info.vlan.address, dev->dev_addr);
+-			type_info.vlan.vlan_tag = vlan_dev_vlan_id(dev);
+-			type_info.vlan.vlan_tpid = ntohs(vlan_dev_vlan_proto(dev));
++			uint16_t dsa_vid = 0;
++
++			ether_addr_copy(type_info.vlan.address, dev->dev_addr);
++			if (is_vlan_dev(dev)) {
++				type_info.vlan.vlan_tag = vlan_dev_vlan_id(dev);
++				type_info.vlan.vlan_tpid = ntohs(vlan_dev_vlan_proto(dev));
++			} else {
++				ecm_interface_dsa_8021q_conduit(dev, &dsa_vid);
++				type_info.vlan.vlan_tag = dsa_vid;
++				type_info.vlan.vlan_tpid = ETH_P_8021Q;
++			}
+ 			DEBUG_TRACE("%px: Net device: %px is VLAN, mac: %pM, vlan_id: %x vlan_tpid: %x\n",
+ 					feci, dev, type_info.vlan.address, type_info.vlan.vlan_tag, type_info.vlan.vlan_tpid);
+ 
+@@ -3989,7 +4057,7 @@
+ 				/*
+ 				 * VLAN?
+ 				 */
+-				if (is_vlan_dev(dest_dev)) {
++				if (ecm_interface_is_vlan_dev(dest_dev)) {
+ 					/*
+ 					 * VLAN master
+ 					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
+@@ -5213,7 +5281,7 @@
+ 				/*
+ 				 * VLAN?
+ 				 */
+-				if (is_vlan_dev(dest_dev)) {
++				if (ecm_interface_is_vlan_dev(dest_dev)) {
+ 					/*
+ 					 * VLAN master
+ 					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
+@@ -6157,7 +6225,7 @@
+ 				/*
+ 				 * VLAN?
+ 				 */
+-				if (is_vlan_dev(dest_dev)) {
++				if (ecm_interface_is_vlan_dev(dest_dev)) {
+ 					/*
+ 					 * VLAN master
+ 					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
+@@ -6818,7 +6886,8 @@
+ 			stats.tx_packets = tx_packets;
+ 			stats.tx_bytes = tx_bytes;
+ 			DEBUG_INFO("vlan call to update status:rx pkt:%u tx pkt:%u", rx_packets, tx_packets);
+-			__vlan_dev_update_accel_stats(dev, &stats);
++			if (is_vlan_dev(dev))
++				__vlan_dev_update_accel_stats(dev, &stats);
+ 			dev_put(dev);
+ 			continue;
+ #endif

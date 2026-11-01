@@ -1,0 +1,75 @@
+From: WG2600HP isolated data-path review 2026-11-01
+Subject: [CANDIDATE 760-11] qca-8021q: guard VLAN-aware bridge TX VID
+
+ISOLATED, NOT FOR BUILD/DEPLOYMENT. Requires 760-01, 760-10, 760-02
+and full DSA VLAN, ECM, NSS and dual-CPU validation.
+
+760-10 still used a deleted standalone VID for unmarked VLAN-aware
+bridge traffic. On a VLAN-aware bridge, preserve only valid 802.1Q tags; reject reserved DSA VIDs.
+For untagged local/routed traffic, request the egress DSA port's PVID
+under RCU and tag that VID, rejecting missing/invalid PVID.
+Reject wrongly typed HW tags, embedded reserved VIDs, marked-but-untagged frames of unknown VLAN, and non-802.1Q
+bridge protocols (including 802.1ad) rather than risking leakage.
+
+This is an unverified isolation candidate, not an assurance of correct
+on-wire behavior, offload compatibility, or bridge functionality.
+No user VLAN interfaces or board network settings are added.
+
+--- a/net/dsa/tag_qca_8021q.c
++++ b/net/dsa/tag_qca_8021q.c
+@@ -67,12 +67,49 @@
+ 
+ 	struct net_device *br = dsa_port_bridge_dev_get(dp);
+ 
+-	/*
+-	 * An offloaded frame in a VLAN-aware bridge already carries the
+-	 * bridge VLAN. Do not add a tag_8021q VLAN on top.
+-	 */
+-	if (skb->offload_fwd_mark && br && br_vlan_enabled(br))
+-		return skb;
++	/*
++	 * On a VLAN-aware bridge, never use the standalone tag_8021q VID:
++	 * bridge_join has removed it. Preserve an existing real VLAN tag.
++	 * For untagged CPU-routed output use this port's bridge PVID.
++	 * An unmarked, untagged forwarding-offload frame has an ambiguous
++	 * VLAN, and must be rejected rather than misrouted.
++	 */
++	if (br && br_vlan_enabled(br)) {
++		u16 proto, vid = 0;
++		int err;
++
++		if (br_vlan_get_proto(br, &proto) || proto != ETH_P_8021Q)
++			return NULL;
++
++		if (skb_vlan_tag_present(skb)) {
++			if (skb->vlan_proto != htons(ETH_P_8021Q) ||
++			    vid_is_dsa_8021q(skb_vlan_tag_get_id(skb)))
++				return NULL;
++			return skb;
++		}
++		if (skb->protocol == htons(ETH_P_8021Q)) {
++			u16 tci;
++			if (__vlan_get_tag(skb, &tci) ||
++			    vid_is_dsa_8021q(tci & VLAN_VID_MASK))
++				return NULL;
++			return skb;
++		}
++		if (skb->protocol == htons(ETH_P_8021AD))
++			return NULL;
++
++		if (skb->offload_fwd_mark)
++			return NULL;
++
++		rcu_read_lock();
++		err = br_vlan_get_pvid_rcu(netdev, &vid);
++		rcu_read_unlock();
++		if (err || !vid || vid_is_dsa_8021q(vid))
++			return NULL;
++
++		pcp = netdev_txq_to_tc(netdev, queue_mapping);
++		return dsa_8021q_xmit(skb, netdev, ETH_P_8021Q,
++				      ((pcp << VLAN_PRIO_SHIFT) | vid));
++	}
+ 
+ 	/*
+ 	 * dsa_tag_8021q_bridge_join() replaces the standalone VID with
