@@ -1,5 +1,7 @@
 name: WG2600HP isolated ECM ARM cross compilation
 on:
+  push:
+    branches: [wg2600hp-nss-integrated-candidate-20261101]
   workflow_dispatch:
 permissions:
   contents: read

@@ -126,7 +126,7 @@ def cross_compile_ecm_objects(linux):
         return True
     if not make(["multi_v7_defconfig"], "multi_v7_defconfig"):
         return 42
-    features = ("NET_DSA", "NET_DSA_QCA8K", "NET_DSA_TAG_QCA_8021Q",
+    features = ("NETFILTER", "NETFILTER_ADVANCED", "NET_DSA", "NET_DSA_QCA8K", "NET_DSA_TAG_QCA_8021Q",
                 "VLAN_8021Q", "BRIDGE", "BRIDGE_NETFILTER", "NF_CONNTRACK",
                 "NETFILTER_XTABLES", "IP_NF_IPTABLES", "IP6_NF_IPTABLES")
     opts = [v for item in features for v in ("-e", item)]
@@ -137,6 +137,14 @@ def cross_compile_ecm_objects(linux):
         return 43
     if not make(["olddefconfig"], "olddefconfig"):
         return 44
+    config = (linux / ".config").read_text().splitlines()
+    required = ("CONFIG_NETFILTER=y", "CONFIG_NF_CONNTRACK=y",
+                "CONFIG_NET_DSA_TAG_QCA_8021Q=y")
+    for key in required:
+        if key not in config:
+            say("ECM_KERNEL_CONFIG=FAIL required " + key)
+            return 49
+    say("ECM_KERNEL_CONFIG=PASS NETFILTER NF_CONNTRACK QCA8021Q")
     if not make(["prepare"], "prepare"):
         return 45
     script = ROOT / "scripts/wg2600hp_ecm_pinned_preflight.sh"
