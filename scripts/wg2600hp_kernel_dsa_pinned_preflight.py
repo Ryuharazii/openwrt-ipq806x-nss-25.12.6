@@ -61,120 +61,90 @@ def run():
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(data)
             print(f"DSA_SOURCE=VERIFIED {name} git_blob={actual}", flush=True)
-        # Diagnostic only: check if staged 760-01 applies on untouched upstream.
-        stage_one = ROOT / PATCHES[4]
-        dry = subprocess.run(
-            ["patch", "--directory", str(scratch), "-p1", "--batch", "--forward",
-             "--dry-run", "--fuzz=0", "--input", str(stage_one)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False,
-        )
-        # Cross-check GNU patch result with git apply on the same untouched
-        # validated 6.12.112 upstream files. This must not auto-correct staging.
-        gitcheck = subprocess.run(
-            ["git", "-C", str(scratch), "apply", "--check", "-p1", str(stage_one)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
-        print(f"DSA_76001_GIT_APPLY_CHECK={'PASS' if gitcheck.returncode == 0 else 'FAIL'}", flush=True)
-        if gitcheck.returncode:
-            print(gitcheck.stdout[-3000:], flush=True)
-        verbose = subprocess.run(
-            ["patch", "--directory", str(scratch), "-p1", "--verbose",
-             "--batch", "--forward", "--dry-run", "--fuzz=0", "--input", str(stage_one)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
-        print(f"DSA_76001_GNU_VERBOSE={'PASS' if verbose.returncode == 0 else 'FAIL'}", flush=True)
-        print(verbose.stdout[-3000:], flush=True)
-        for label, options in (
-            ("IGNORE_SPACE", ["--ignore-whitespace"]),
-            ("DEFAULT_FUZZ", []),
-            ("POSIX", ["--posix"]),
-        ):
-            extra = subprocess.run(
-                ["patch", "--directory", str(scratch), "-p1", "--batch",
-                 "--forward", "--dry-run", "--input", str(stage_one)] + options,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                check=False)
-            print(f"DSA_76001_GNU_{label}={'PASS' if extra.returncode == 0 else 'FAIL'}", flush=True)
-            if extra.returncode:
-                print(extra.stdout[-350:], flush=True)
-        # Regenerate only the 760-01 diff from the exact upstream files
-        # after git apply, then test a canonical GNU unified diff at fuzz=0.
-        # This is a diagnostic, NOT an automatic substitution or source build.
-        with tempfile.TemporaryDirectory(prefix="wg2600hp-canonical-") as modified_dir:
-            modified = Path(modified_dir)
-            for path in UPSTREAM_BLOBS:
-                q = modified / path
-                q.parent.mkdir(parents=True, exist_ok=True)
-                q.write_bytes((scratch / path).read_bytes())
-            applied = subprocess.run(
-                ["git", "-C", str(modified), "apply", "-p1", str(stage_one)],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
-            print(f"DSA_76001_GIT_APPLY_ACTUAL={'PASS' if applied.returncode == 0 else 'FAIL'}", flush=True)
-            if applied.returncode:
-                print(applied.stdout[-3000:], flush=True)
-            else:
-                target_files = [
-                    "include/net/dsa.h", "net/dsa/Kconfig", "net/dsa/Makefile",
-                    "net/dsa/tag_qca_8021q.c",
-                ]
-                canonical = ""
-                for path in target_files:
-                    original = scratch / path
-                    revised = modified / path
-                    old = original.read_text(encoding="utf-8").splitlines(keepends=True) if original.exists() else []
-                    new = revised.read_text(encoding="utf-8").splitlines(keepends=True)
-                    if old != new:
-                        canonical += "".join(difflib.unified_diff(
-                            old, new, fromfile="a/" + path if original.exists() else "/dev/null",
-                            tofile="b/" + path, n=3))
-                candidate = modified / "760-01-generated.patch"
-                candidate.write_text(canonical, encoding="utf-8")
-                rebuilt = subprocess.run(
-                    ["patch", "--directory", str(scratch), "-p1", "--batch",
-                     "--forward", "--dry-run", "--fuzz=0", "--input", str(candidate)],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
-                print(f"DSA_76001_CANONICAL_GNU_F0={'PASS' if rebuilt.returncode == 0 else 'FAIL'}", flush=True)
-                if rebuilt.returncode:
-                    print(rebuilt.stdout[-3500:], flush=True)
-                else:
-                    print("DSA_76001_CANONICAL_PATCH_BEGIN", flush=True)
-                    print(canonical.rstrip("\n"), flush=True)
-                    print("DSA_76001_CANONICAL_PATCH_END", flush=True)
-        print(f"DSA_76001_STOCK_DRY_RUN={'PASS' if dry.returncode == 0 else 'FAIL'}", flush=True)
-        if dry.returncode:
-            print(dry.stdout[-2500:], flush=True)
+        # Strict gate. GNU patch failures are checked via git apply in a
+        # TEMPORARY source only to diagnose downstream patches. Never PASS.
+        strict_failures = []
         for relative in PATCHES:
             patch_file = ROOT / relative
             if not patch_file.is_file():
                 print(f"DSA_PATCH=FAIL missing {relative}", flush=True)
                 return 12
-            result = subprocess.run(
-                ["patch", "--directory", str(scratch), "-p1", "--batch", "--forward",
-                 "--fuzz=0", "--no-backup-if-mismatch", "--input", str(patch_file)],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False,
-            )
-            if result.returncode:
-                print(f"DSA_PATCH=FAIL {relative}", flush=True)
-                print(result.stdout[-6000:], flush=True)
-                if "760-01-" in relative:
-                    for file in ("include/net/dsa.h", "net/dsa/Makefile"):
-                        data = (scratch / file).read_bytes()
-                        print(f"DSA_PRE_76001_BLOB {file} {git_blob_sha(data)}", flush=True)
-                    patch_lines = patch_file.read_text(encoding="utf-8").splitlines()
-                    current = ""
-                    for idx, line in enumerate(patch_lines):
-                        if line.startswith("+++ b/"):
-                            current = line[6:]
-                        if current not in ("include/net/dsa.h", "net/dsa/Makefile") or not line.startswith("@@ "):
-                            continue
-                        old = []
-                        for l in patch_lines[idx + 1:]:
-                            if l.startswith("@@ ") or l.startswith("--- "):
-                                break
-                            if l.startswith(" ") or l.startswith("-"):
-                                old.append(l[1:])
-                        source = (scratch / current).read_text(encoding="utf-8")
-                        print(f"DSA_FAILED_HUNK_CONTEXT {current} {line} exact_source_match={chr(10).join(old) in source}", flush=True)
+            cmd = ["patch", "--directory", str(scratch), "-p1", "--batch",
+                   "--forward", "--fuzz=0", "--input", str(patch_file)]
+            dry = subprocess.run(cmd + ["--dry-run"],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, check=False)
+            if dry.returncode == 0:
+                actual = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, text=True,
+                                        check=False)
+                if actual.returncode:
+                    print(f"DSA_PATCH=FAIL actual-apply {relative}", flush=True)
+                    print(actual.stdout[-3500:], flush=True)
+                    return 21
+                print(f"DSA_PATCH=PASS {relative}", flush=True)
+                continue
+            print(f"DSA_PATCH=GNU_F0_FAIL {relative}", flush=True)
+            print(dry.stdout[-1000:], flush=True)
+            strict_failures.append(relative)
+            targets = list(dict.fromkeys(
+                line[6:] for line in patch_file.read_text(encoding="utf-8").splitlines()
+                if line.startswith("+++ b/")))
+            originals = {
+                path: ((scratch / path).read_bytes() if (scratch / path).exists() else None)
+                for path in targets
+            }
+            check = subprocess.run(
+                ["git", "-C", str(scratch), "apply", "--check", "-p1", str(patch_file)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+            if check.returncode:
+                print(f"DSA_GIT_APPLY=FAIL {relative}", flush=True)
+                print(check.stdout[-3000:], flush=True)
                 return 21
-            print(f"DSA_PATCH=PASS {relative}", flush=True)
+            actual = subprocess.run(
+                ["git", "-C", str(scratch), "apply", "-p1", str(patch_file)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+            if actual.returncode:
+                print(f"DSA_GIT_APPLY=FAIL actual {relative}", flush=True)
+                print(actual.stdout[-3000:], flush=True)
+                return 21
+            print(f"DSA_GIT_APPLY=PASS diagnostic-only {relative}", flush=True)
+            canonical = ""
+            for path, before in originals.items():
+                after = (scratch / path).read_text(encoding="utf-8").splitlines(keepends=True)
+                old = before.decode("utf-8").splitlines(keepends=True) if before is not None else []
+                if old != after:
+                    canonical += "".join(difflib.unified_diff(
+                        old, after,
+                        fromfile="a/" + path if before is not None else "/dev/null",
+                        tofile="b/" + path, n=3))
+            with tempfile.TemporaryDirectory(prefix="wg2600hp-regenerated-") as old_dir:
+                base = Path(old_dir)
+                for path, data in originals.items():
+                    if data is not None:
+                        dst = base / path
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        dst.write_bytes(data)
+                diff_file = base / "regenerated.patch"
+                diff_file.write_text(canonical, encoding="utf-8")
+                d = subprocess.run(
+                    ["patch", "--directory", str(base), "-p1", "--batch", "--forward",
+                     "--dry-run", "--fuzz=0", "--input", str(diff_file)],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    check=False)
+            print(f"DSA_CANONICAL_F0={'PASS' if d.returncode == 0 else 'FAIL'} {relative}", flush=True)
+            if d.returncode:
+                print(d.stdout[-1200:], flush=True)
+            else:
+                print(f"DSA_CANONICAL_PATCH_BEGIN {relative}", flush=True)
+                print(canonical.rstrip("\n"), flush=True)
+                print(f"DSA_CANONICAL_PATCH_END {relative}", flush=True)
+        if strict_failures:
+            print(f"DSA_PATCH_CHAIN=FAIL strict_fuzz0_failures={len(strict_failures)}", flush=True)
+            for name in strict_failures:
+                print(f"DSA_REQUIRED_FIX={name}", flush=True)
+            print("DSA_SCOPE=DIAGNOSTIC_GIT_FALLBACK_ONLY NO_BUILD NO_BOOT NO_NSS_ACK", flush=True)
+            return 21
         print("DSA_PATCH_CHAIN=PASS 7 verified upstream source files, 12 patch steps", flush=True)
         print("DSA_SCOPE=SELECTED_SUBSET_ONLY NO_OPENWRT_FULL_PATCHSET NO_COMPILE NO_BOOT NO_NSS_ACK", flush=True)
         return 0

@@ -460,3 +460,9 @@
 - CI [#41274162258](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274162258) 上でLinux `v6.12.112` 7実ソース blob検証後、元`760-01`を`git apply`で一時コピーへ**実適用PASS**。その変更後ファイルとSHA固定の元ファイルから**実差分を再生成**したところ、標準のGNU`patch --fuzz=0`で**dry-run PASS**（`DSA_76001_CANONICAL_GNU_F0=PASS`）。一方、旧760-01の調整版はfuzz=0 FAIL。単純な元コード不一致ではなく差分の文脈形式の問題を再生成により解消できた。
 - 今回、同CIで出力したcanonical unified diffに既存パッチ説明ヘッダーを付し、隔離ブランチの`target/linux/generic/pending-6.12/760-01-...`を**置換**。置換前後の追加行・削除行を完全照合し一致（**実際の変更コード・パッチ対象4ファイルは同一**）。新パッチ自体の順次適用結果および760-02/03以降は次のGitHub Actionsで要確認。**「760系全体PASS」やビルド/実機PASSではない**。
 - 既存WAN→eth0、LAN→eth1、VLAN設定および通常ブランチは変更なし。G1/G2未完、G3 FAIL、ARMファームビルド/書込みなし。
+
+## 2026-11-01 第23セッション：DSA後続パッチの包括的な厳格適用診断
+
+- GitHub Actions [#41274228173](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274228173)：正規化760-01は`patch --fuzz=0`でPASS、既存711/712と760-02/03もPASS。次の隔離`760-06`が`net/dsa/tag_8021q.c`でFAIL。**760系全体はFAIL**。
+- 反復的な単一箇所修正を避けるため、選択した12パッチの全順序を変えず**各パッチをGNU --fuzz=0 dry-run→本適用**で審査。失敗時だけ、隔離CIの一時ソースでgit applyができるか別経路で検査し、続く候補の障害箇所も収集する。元→後の実ファイルから標準diffを生成し、別の一時領域でGNU strict dry-runできた場合のみ候補をログに出力。診断用git apply成功はGNUチェックの合格にすり替えず、途中1件でもGNU失敗なら**CI終了コード21 / FAIL**とする。候補内容はレビュー前に自動的に作業ソースへ統合しない。
+- これにより反復の負担を減らし、760-06/08/09/10/11などの不整合をまとめて洗い出す。フルOpenWrt patch tree、ARM build、起動、LAN→WAN、FW NSS CREATE/ACK、Wi-Fi/IPIP6は別ゲート。**G1/G2未完、G3 FAIL、FWビルド・フラッシュ禁止**。
