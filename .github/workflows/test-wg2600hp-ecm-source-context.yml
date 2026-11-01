@@ -1,0 +1,20 @@
+name: WG2600HP ECM actual failing source context
+
+on:
+  push:
+    branches: [wg2600hp-nss-integrated-candidate-20261101]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ecm-context:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source branches behind real ARM compiler errors
+        run: bash scripts/wg2600hp_ecm_pinned_preflight.sh --source-context
+      - name: Scope
+        run: echo "ECM compiler error source context only; no kernel or firmware compilation."

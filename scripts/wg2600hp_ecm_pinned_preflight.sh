@@ -134,6 +134,15 @@ if [ "$#" -eq 2 ] && [ "$1" = "--arm-kernel" ]; then
     echo "ECM_ARM_OBJECT=PASS $obj"
   done
   echo "ECM_ARM_SCOPE=OBJECTS_ONLY NO_FIRMWARE NO_BOOT NO_NSS_ACK"
+elif [ "$#" -eq 1 ] && [ "$1" = "--source-context" ]; then
+  echo "ECM_SOURCE_CONTEXT=BEGIN patched ecm_nss_ported_ipv4.c"
+  sed -n '1020,1085p' "$src/frontends/nss/ecm_nss_ported_ipv4.c"
+  sed -n '1185,1225p' "$src/frontends/nss/ecm_nss_ported_ipv4.c"
+  echo "ECM_SOURCE_CONTEXT=HEADERS"
+  sed -n '1,115p' "$src/frontends/nss/ecm_nss_ported_ipv4.c"
+  echo "ECM_SOURCE_CONTEXT=MAKEFILE_REFERENCES"
+  grep -n -i 'mirror\|ECM_FRONT_END_NSS\|ECM_INTERFACE_VLAN' "$src/Makefile" | head -n 70 || true
+  echo "ECM_SOURCE_CONTEXT=END source extraction; no compile"
 elif [ "$#" -eq 0 ]; then
   echo "ECM_SCOPE=SOURCE_APPLY_ONLY NO_ARM_BUILD NO_BOOT NO_NSS_ACK"
 else
