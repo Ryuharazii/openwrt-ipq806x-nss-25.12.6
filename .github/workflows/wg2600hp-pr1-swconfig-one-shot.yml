@@ -1,0 +1,123 @@
+name: WG2600HP PR1 isolated swconfig build 4729abc
+
+on:
+  push:
+    branches:
+      - 'wg2600hp-swconfig-4729abc-build-20261101'
+    paths:
+      - '.github/workflows/wg2600hp-pr1-swconfig-one-shot.yml'
+
+concurrency:
+  group: wg2600hp-nss-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wg2600hp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      SRC: /home/owner/wg2600hp-25.12.6-swconfig
+      REF_SHA: 4729abc6daea7b64499f6584066a34d613aa9b2b
+    steps:
+      - name: Step 1 - clone PR1 to new /home/owner directory
+        run: |
+          sudo mkdir -p /home/owner
+          sudo chown "$(id -u):$(id -g)" /home/owner
+          test ! -e "$SRC"
+          timeout 30m git clone --single-branch --branch wg2600hp-nss-25.12.6-build https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6.git "$SRC"
+          cd "$SRC"
+          test "$(git rev-parse HEAD)" = "$REF_SHA"
+          printf 'STEP1_CLONE	PASS\n' > build-gates.tsv
+          if find /home/owner -maxdepth 1 -type f \( -iname '*25.12.5*' -o -iname '*backup*' \) | grep -q .; then
+            printf 'STEP1_BACKUP	PRESENT\n' >> build-gates.tsv
+          else
+            printf 'STEP1_BACKUP	NOT_FOUND\n' >> build-gates.tsv
+          fi
+          printf 'STEP1_UART_TFTP_RECOVERY	NOT_FOUND_ON_RUNNER\n' >> build-gates.tsv
+
+      - name: Free disk space
+        run: |
+          cd "$SRC"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force >/dev/null || true
+
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-setuptools python3-dev rsync swig unzip zlib1g-dev file wget zstd
+
+      - name: Step 2 - static gate once before build
+        run: |
+          cd "$SRC"
+          dts=target/linux/ipq806x/files-6.12/arch/arm/boot/dts/qcom/qcom-ipq8064-wg2600hp.dts
+          patchfile=target/linux/ipq806x/patches-6.12/990-0001-Add-required-entries-in-dts-files-for-NSS-support.patch
+          fw=package/qca-nss/qca-nss-drv/files/nss-firmware
+          bad=0
+          record() {
+            if test "$1" = "0"; then
+              printf '%s	PASS\n' "$2" | tee -a build-gates.tsv
+            else
+              printf '%s	FAIL\n' "$2" | tee -a build-gates.tsv
+              bad=1
+            fi
+          }
+          grep -Fq 'qca,ar8327-initvals' "$dts" && ! grep -Eq 'dsa-tag-protocol|qca,qca8337' "$dts"; record "$?" STEP2_SWCONFIG
+          grep -Fq 'nss-common {' "$patchfile"; record "$?" STEP2_NSS_COMMON
+          grep -Fq 'nss-gmac-common {' "$patchfile"; record "$?" STEP2_NSS_GMAC_COMMON
+          strings -a "$fw/qca-nss0-retail.bin" | grep -Fq 'NSS.AK.11.2-9-002-R'; record "$?" STEP2_FW0_VERSION
+          strings -a "$fw/qca-nss1-retail.bin" | grep -Fq 'NSS.AK.11.2-9-002-R'; record "$?" STEP2_FW1_VERSION
+          test "$(git rev-parse HEAD)" = "$REF_SHA" && git diff --quiet HEAD -- "$fw/qca-nss0-retail.bin" "$fw/qca-nss1-retail.bin"; record "$?" STEP2_UNMIXED_FW
+          test "$bad" -eq 0
+      - name: Configure WG2600HP only
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          unzip -o VHTNSS.zip
+          cp diff-wg2600hp-nss .config
+          make defconfig
+          grep -Fx 'LINUX_VERSION-6.12 = .112' target/linux/generic/kernel-6.12
+          for option in CONFIG_TARGET_ipq806x_generic_DEVICE_nec_wg2600hp CONFIG_TARGET_ROOTFS_INITRAMFS CONFIG_PACKAGE_kmod-qca-nss-gmac CONFIG_PACKAGE_kmod-qca-nss-drv CONFIG_PACKAGE_kmod-qca-nss-ecm-standard CONFIG_PACKAGE_kmod-qca-nss-drv-tunipip6 CONFIG_NSS_DRV_TUNIPIP6_ENABLE CONFIG_NSS_DRV_IPV6_ENABLE; do
+            grep -Fx "${option}=y" .config || exit 1
+          done
+          cp .config wg2600hp-resolved.config
+
+      - name: Download source archives
+        run: make -j8 download
+
+      - name: Build firmware
+        run: |
+          timeout 2h bash -c 'make -j$(nproc) || make -j1 V=s' 2>&1 | tee build.log
+
+      - name: Verify and stage WG2600HP images
+        run: |
+          mkdir -p out
+          find bin/targets/ipq806x/generic -maxdepth 1 -type f -name '*nec_wg2600hp-*' -exec cp {} out/ \;
+          test -n "$(find out -maxdepth 1 -type f -name '*.bin' -o -name '*initramfs*')"
+          cp wg2600hp-resolved.config out/
+          manifest=$(find bin/targets/ipq806x/generic -maxdepth 1 -name '*nec_wg2600hp.manifest' -print -quit)
+          test -n "$manifest"
+          cp "$manifest" out/
+          test -n "$(find out -maxdepth 1 -name '*nec_wg2600hp-initramfs-uImage' -print -quit)"
+          test -n "$(find out -maxdepth 1 -name '*nec_wg2600hp-squashfs-sysupgrade.bin' -print -quit)"
+          for pkg in kmod-qca-nss-drv kmod-qca-nss-gmac kmod-qca-nss-ecm-standard kmod-qca-nss-drv-tunipip6; do
+            grep -Eq "^$pkg[[:space:]]" "$manifest"
+          done
+          test -n "$(find build_dir -type f -path '*/root-*/lib/firmware/qca-nss0.bin' -print -quit)"
+          test -n "$(find build_dir -type f -path '*/root-*/lib/firmware/qca-nss1.bin' -print -quit)"
+          grep -Fx 'LINUX_VERSION-6.12 = .112' target/linux/generic/kernel-6.12
+          printf 'STEP4_IMAGE_GATE	PASS\n' >> build-gates.tsv
+          printf 'STEP5_RAM_BOOT	NOT_RUN_HARDWARE_REQUIRED\nSTEP6_LINUX_NSS	NOT_RUN_HARDWARE_REQUIRED\nSTEP7_OFFLOAD	NOT_RUN_HARDWARE_REQUIRED\nSTEP8_FLASH	PROHIBITED\n' >> build-gates.tsv
+          (cd out && sha256sum * > SHA256SUMS)
+          ls -lh out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WG2600HP-PR1-SWCONFIG-4729abc
+          path: |
+            /home/owner/wg2600hp-25.12.6-swconfig/out/
+            /home/owner/wg2600hp-25.12.6-swconfig/build-gates.tsv
+            /home/owner/wg2600hp-25.12.6-swconfig/build.log
+            /home/owner/wg2600hp-25.12.6-swconfig/wg2600hp-resolved.config
+          if-no-files-found: warn
+          retention-days: 30
