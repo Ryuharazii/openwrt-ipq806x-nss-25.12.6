@@ -510,3 +510,9 @@
 - 続いて未統合のDSA隔離760-02/03/06/08/09/10/11を`patch --fuzz=0`で**7/7 PASS**。DSLではなくQCAタグ識別子についても**29=BRCM_LEGACY_FCS、30=QCA_8021Qが重複なし**と検査PASS。別系統の素のLinux8ファイル＋611-01+711/712+760候補13ステップもPASS。ECM固定pinソースへの既存9本＋760-04/05の実適用11/11 PASS。host C模擬12/12、diagnostic 8件、ECM guard6件も完走。
 - これは**OpenWrtの完全カーネルソースに対するパッチ適用の実証**であり、実機起動・ARMコンパイル・動作・NSS FWタグ解釈・ECM CREATE/ACKの合格ではない。未統合の760系は作業ツリーに追加されていない（baseline上では760-01だけ適用）。OpenWrtのhost-preflight成功をG3全体PASSとはしない。**G1/G2未完、G3 FAIL**。
 - 追加で`760-07`のDTS両CPUポートと`config-6.12`を、一時コピーに対するstrict-fuzz0適用・選択値照合で確認するゲートを追加。**CIでの結果は未確認**。通常ブランチ、ユーザーLAN/WAN/VLAN設定を変更しない。FWビルド・書込みなし。
+
+## 2026-11-01 第24セッション：760-07 DTS/Kconfigと全OpenWrtカーネルパッチの回帰PASS（限定証明）
+
+- 直接確認：隔離コミット`eb6cc16f9fe7849b16e3c022e58712499bf56ae9`、GitHub Actions [#41275220784](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41275220784)、job`124755934439` `completed/success`。ソース・ログに`DTS_CONFIG_76007_APPLY=PASS strict fuzz0, isolated copy`、CPU0→GMAC1/rgmii・CPU6→GMAC2/sgmii、両側`dsa-tag-protocol="qca-8021q"`、`NET_DSA_TAG_QCA_8021Q=y`、標準QCAタグger保持の静的チェックPASSを確認。**ただし設定変更は一時ファイルのみで、通常ビルドに760-07は未統合。**
+- 同じCIで再度、OpenWrtの固定SHA256が一致するLinux6.12.112全原本へOpenWrt既存586パッチ（backport277/pending152/hack56/ipq806x101）を公式順に適用しPASS。既存12件のfuzz/offsetは残るため完全fuzz0の全件PASSとは表現しない。追加のステージ760-02/03/06/08/09/10/11は**7/7 strict fuzz0 PASS**、プロトコルID **29=BRCM_LEGACY_FCS、30=QCA_8021Q** 重複なし。選択DSA13本の実適用、ECM固定原本＋既存9本＋760-04/05の11本適用PASSも継続。スタンドアロンのDTS/config候補`760-07`の元差分で失敗した3ハンクは原本ファイルからcanonical unified diffを再生成、追加/削除行に変化がないことを検査して解決した。
+- **未達**：これらは全kernelソースへのパッチ適用・設定差分の適用検査であり、ARMコンパイル、GMAC/DSA起動・電源投入から全経路の実動作、WAN/LAN通信、NSS CREATE/ACK・RX/TX増分、Wi-Fi、固定IPIP6を確認したものではない。NSSとQCAタグのFW互換性が未証明、stage 760-02以降は通常kernel patchに存在しない。**G1/G2未完了、G3 FAIL。ファームビルド、RAM実機テスト、新フラッシュ書込みは未実施**。既存通常作業ブランチ、ネットワーク設定を変更しない。
