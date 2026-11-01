@@ -283,3 +283,11 @@
 - 同じZIP内の ARM uImage バイト位置 8,819,232、FDT version 17、DTB全長 36,855 bytes の実FDTを解析（ヘッダーの長さ・文字列表・構造トークンを照合）。
 - `/soc/nss-common` ノードが存在。NSS0 `/soc/nss@40000000` に `qcom,tunipip6-enabled`、`qcom,wlanredirect-enabled`、`qcom,wlan-dataplane-offload-enabled` の**各ブールプロパティ**が存在する。NSS1は別の機能群を担当。該当プロパティの `_` / `-` 誤記はこの実DTBでは検出されない。
 - 以上は**旧ビルドの設定・バイナリの存在確認のみ**。実機の固定IPIP6/Wi-FiのNSSオフロード成功は未実証であり、完成ではない。実機NSS rule/offloadカウンタ増分までG6未確認を維持。
+
+## 2026-11-01 実ZIPの起動時処理と固定IPIP6 notifier を再照合（作業再開）
+
+- **原本・実測**: 11/01アップロード `WG2600HP-IPQ8064-25.12.6-NSS(20261101-002842).zip` SHA256 `41586c4a4310af3fe5848810cf2b413bc8610bd1c9f414dce5510b456ceae929`。uImage→XZ→newc initramfs（1356件）を実際に再展開し、`qca-nss-tunipip6.ko` ELF32 ARM, 22,984 bytes, `vermagic=6.12.112`, `depends=qca-nss-drv,ip6_tunnel` を読み取った。
+- **固定IPIP6の実コード呼出し元**: `llvm-objdump -dr` で `nss_tunipip6_dev_event` を確認。netdev型 `ARPHRD_TUNNEL6 (=0x301)` のみを受け付け、`NETDEV_UP (=1)` は作成処理へ、`NETDEV_DOWN (=2)` は `nss_connmgr_tunipip6_destroy_interface` へ分岐。`nss_tunipip6_init_module` が `of_find_node_by_name` を行い、通常モードで `register_netdevice_notifier` を呼ぶ。コードの存在は**実機成功の証拠ではない**。なおこのmoduleは `enable_custom` boolを持ち、初期値0時は自動notifier登録経路が存在する。
+- **起動時モジュール・ECM初期化の実ファイル**: initramfsの `etc/modules.d/31-qca-nss-gmac` → `32-qca-nss-drv` → `60-qca-nss-drv-tunipip6` の各ファイル内容を読み取った。ECM初期UCI値は `auto` だが、収録されている `etc/uci-defaults/99-wg2600hp-nss-ecm` が対象機種で `ecm.global.acceleration_engine='nss'` に設定し、`/etc/init.d/qca-nss-ecm` をenableする。 `etc/rc.d/S96wg2600hp-nss-ecm` へのシンボリックリンクも収録。ただし **UCI defaults実行時刻・ECM起動成功・トンネルIF生成/ACKは新規実機ログ未取得**。
+- **横断確認範囲**: Linux側のRAMイメージから起動用ファイルとNSS呼出し関係まで照合した。**電源投入/Boot ROM/U-Bootの一連の実機ログは未取得**。旧RAM起動→WAN DHCP→LAN→WAN IPv4疎通は既存G5ログPASS。ECM `FAIL_RULE=-2` / DSA AE IF `-1` は既存G6 FAIL。Wi-Fiと固定IPIP6の実機NSS統計増分は未確認。したがって **G1全経路未確認、G2未確認、G3 FAIL** を維持し、ビルド/書込みなし。
+- **次の焦点**: 既知の旧ZIPを再検査し続けず、ECM/DSAの隔離候補の安全性と起動経路・後続影響を満たしてから統合。既存の `wg2600hp-net-audit` はboard_name照合を含む読み取り専用の検証スクリプト。Ubuntuでの誤実行を実機の証拠に数えない。
