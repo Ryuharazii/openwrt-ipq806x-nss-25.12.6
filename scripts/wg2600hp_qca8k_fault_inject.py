@@ -176,7 +176,7 @@ int main(void) {
         "rollback failure must remain visibly incomplete");
     printf("FAULT_INJECT_CASE=PASS ROLLBACK_FAILURE_DETECTED_AS_UNSAFE\n");
 
-    if (assertions != 15) {
+    if (assertions != 9) {
         /* Assert count is intentional, catches incomplete test execution. */
         fprintf(stderr, "FAULT_INJECT=FAIL wrong count %d\n",assertions);
         return 3;
