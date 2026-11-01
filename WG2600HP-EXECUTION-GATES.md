@@ -581,3 +581,10 @@
 - 同じ完全パッチ適用後の現物`qca8k-common.c`から`qca8k_port_set_pvid`、`qca8k_commit_pvid`、`qca8k_tag_8021q_vlan_snapshot`、`qca8k_tag_8021q_vlan_add`の**実C関数本文を抽出**し、模擬レジスタ/VTU/DSAを使ったホストC失敗注入を実行。**8/8ケースPASS**：PVID成功、PVID第1/第2書込み失敗、新規VLAN成功、新規VLAN PVID失敗、既存VLANのタグモード保全、VTU追加失敗、復旧書込み失敗の検出。旧run`#41279733217`はテスト内assert件数の記述誤り（15対9）でFAIL、コミット`5cde09a756e5f1eb5a33e6e860c84f0dec6d27a7`で修正し実run成功を確認した。失敗runをPASSには数えない。
 - **限界**：失敗注入は実C関数だがモック下のホスト実行であり、現物QCA8337のMDIO故障・ロック競合・部分ハードウェア書込み・電源投入後の動作を検証しない。そもそも復旧側のMDIOも失敗すれば安全な状態を保証できない。**G1一部実機記録済・G2 ARMオブジェクト/模擬故障試験まで改善・G3 FAIL**。ファームビルド／RAM試験／sysupgrade実施なし、通常ブランチ未変更。
 - 次の行動：コンパイルで検出できないNSS/ECMのクロスモジュール接続、CPU0/6のハードウェア分離とDSA MTU、実起動/タグ切替の事故復旧条件を個別に検証し、ゲート未達のまま新しいイメージを安全だと宣言しない。
+
+## 2026-11-01 第28セッション：ECM NSS IPv4実CソースのARMコンパイルPASS
+
+- 隔離統合ブランチ`wg2600hp-nss-integrated-candidate-20261101`、実行コミット`f9fcd3ab50e8eb9f696f171120592bde26baca8e`、[GitHub Actions #41281477729](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41281477729) job`124774113836` `completed/success`を実ログで確認。
+- **検査スクリプトの実欠陥修正**：ECM active packageの`760-04/05`をstagingからさらに再適用する二重処理を修正。activeとstageの同一性確認の上で、`package/qca-nss/qca-nss-ecm/patches`全11パッチを**各1回のみ**適用。検証用のARMクロス環境へNSS driver exact pin `3cfb9f43536e77ae05a141cce18a242b85e834ab`とOpenWrt Build/Configureによる`nss_arch.h`を再現。ECM標準構成のコンパイラフラグ・PCC無効・NETFILTER/NF_CONNTRACK/QCA8021Q有効化を反映。
+- **新たな実コンパイル証拠**：`ECM_ARM_OBJECT=PASS ecm_interface.o`、`ECM_ARM_OBJECT=PASS frontends/nss/ecm_nss_ported_ipv4.o`、`ECM_ARM_BUILD=PASS pinned ECM objects for ARM`。Linux6.12.112のOpenWrt594パッチ実適用とソースpin `9acdcb05...`＋11ECMパッチを実際に使用した。古い診断runのFAILはテスト環境の不備（短縮pin、生成ヘッダー、警告フラグ、PCC・NF選択）であり、以前のソース未整合と誤認しない。
+- **限界**：外部ECMモジュール全体のリンク/`modpost`、NSS/GMACの`Module.symvers`、ECM IPv4 `AE IF=-1`の実機修正、NSS IPv4 CREATE/ACKやタグ処理、Wi-Fi/IPIP6、RAM起動はまだ未検証。**G1/G2未完／G3 FAIL**、ファーム新規ビルド／書込みなし。DSA既存4件コンパイル・故障8ケースの重複実行なし、通常ブランチ未変更。

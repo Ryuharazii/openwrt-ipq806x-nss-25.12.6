@@ -58,3 +58,7 @@ The only automatic integrated CI now targets ECM ARM compilation; prior
 ARM DSA and source-assembly tests are manual to avoid repeating completed
 work. This does not generate or flash any firmware. ECM compilation result
 must be taken from CI logs; no assumption of PASS.
+
+## ECM ARM compilation evidence — 2026-11-01
+
+[GitHub Actions #41281477729](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41281477729): two exact pinned NSS-enabled ECM C objects compiled to ARM successfully after fixing duplicate 760-04/05 application and faithfully preparing generated NSS driver arch/version includes. This is **not** full module link, firmware build, or hardware NSS offload proof. G1/G2 incomplete, G3 FAIL.

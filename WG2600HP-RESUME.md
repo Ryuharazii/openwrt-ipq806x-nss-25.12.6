@@ -133,3 +133,8 @@
 
 - Active隔離統合ブランチ`wg2600hp-nss-integrated-candidate-20261101`、実行コミット`5cde09a756e5f1eb5a33e6e860c84f0dec6d27a7`、[Actions #41279782972](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279782972) job124769154671 completed/success。OpenWrt594本、ARM DSA4/4実オブジェクト、実パッチ後`qca8k-common.c`のC関数を抽出した模擬故障8/8がPASS。これは以前までなかった実コンパイルと失敗注入実測。
 - **残るG2範囲**は実MDIO I/O復旧保証、CPU0/6 L2分離、ECM NSS IPv4 CREATE/ACK、Wi-Fi、TUNIPIP6、DSA MTU。G1は旧RAM起動部分PASS、新イメージとBootROM/U-Boot全ログ未確認。G3 FAIL、ファーム全体のビルド/実機RAM起動/フラッシュ無し。通常ブランチは不変。
+
+## 2026-11-01 第28セッションの実作業・ECMコンパイル成功
+
+- 隔離統合候補`wg2600hp-nss-integrated-candidate-20261101` commit `f9fcd3ab50e8eb9f696f171120592bde26baca8e`、[CI #41281477729](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41281477729) PASS。ECM11パッチを一度ずつ適用するようバグを修正し、実pin NSS include・ARMカーネル・ECM標準構成で`ecm_interface.o`と`frontends/nss/ecm_nss_ported_ipv4.o`がARMコンパイルPASS。既知DSAコンパイル/モデル故障検証は再実行せず。
+- 次はECM/NSSドライバとの**モジュールリンクと符号照合**を確認し、残G1/G2のビルド前/実機後項目を峻別してG3判断。新FW/RAM起動/実機NSS ACK未実施、G3 FAIL。通常ブランチ未変更。
