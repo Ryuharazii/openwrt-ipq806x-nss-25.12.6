@@ -503,3 +503,10 @@
 - 修正コミット`3ba024935e8f710fb17cfb3000010b8299d46864`の隔離CI [#41274860133](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274860133)では、`760-01`の29→30変更後、以前の素のLinuxだけを基準にした選択試験の第一ハンクがstrict-fuzz0 FAILして後段は未実行。**この検証の起点は公式OpenWrtが既に`611-01`を適用した状態とは異なる**。
 - 厳格な選択ゲートを、Linux v6.12.112タグ本体7ファイルに`net/dsa/tag_brcm.c`の固定blob（`df0ab8215b8101fa781557c97af18aa12e8dcf66`）を追加した8ファイルへ拡張。`611-01`→711/712→760系8本の合計13本を実適用し、29=BRCM_FCS、30=QCA_8021Q の一意性を必須とした。修正した760-01の第一ハンクは、611-01が追加した識別子29の直後に30を置く標準diff文脈とし、パッチ本体のタグ機能は変更しない。これが本当にstrict-fuzz0で通るかは新CIログ確認前まで**未判定**。
 - 全kernel archive＋全patch試験も同じ候補を使用。通常ブランチ、LAN/WAN/VLAN設定は不変更。G1/G2未完、**G3 FAIL**、ビルド・フラッシュなし。
+
+## 2026-11-01 第24セッション：全OpenWrt 586本＋隔離7本の実ソース適用PASSを確認
+
+- 実証コミット`eab26a63a066453fef395a8a496c01769e40796f`、GitHub Actions [#41274991840](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274991840)、job 124755253366 `completed/success`。Linux 6.12.112 tar.xz（148648524 byte）をOpenWrt固定SHA256で検証後に一時展開、generic/filesとipq806x/files-6.12オーバーレイ複写。**OpenWrt backport277 + pending152 + hack56 + ipq806x101 = 586件を公式順・`patch -f -p1`で実適用PASS**。12件はfuzz又はoffsetによる位置文脈調整があったためログに個別記録し、厳格fuzz0の完全一致とは主張しない。
+- 続いて未統合のDSA隔離760-02/03/06/08/09/10/11を`patch --fuzz=0`で**7/7 PASS**。DSLではなくQCAタグ識別子についても**29=BRCM_LEGACY_FCS、30=QCA_8021Qが重複なし**と検査PASS。別系統の素のLinux8ファイル＋611-01+711/712+760候補13ステップもPASS。ECM固定pinソースへの既存9本＋760-04/05の実適用11/11 PASS。host C模擬12/12、diagnostic 8件、ECM guard6件も完走。
+- これは**OpenWrtの完全カーネルソースに対するパッチ適用の実証**であり、実機起動・ARMコンパイル・動作・NSS FWタグ解釈・ECM CREATE/ACKの合格ではない。未統合の760系は作業ツリーに追加されていない（baseline上では760-01だけ適用）。OpenWrtのhost-preflight成功をG3全体PASSとはしない。**G1/G2未完、G3 FAIL**。
+- 追加で`760-07`のDTS両CPUポートと`config-6.12`を、一時コピーに対するstrict-fuzz0適用・選択値照合で確認するゲートを追加。**CIでの結果は未確認**。通常ブランチ、ユーザーLAN/WAN/VLAN設定を変更しない。FWビルド・書込みなし。
