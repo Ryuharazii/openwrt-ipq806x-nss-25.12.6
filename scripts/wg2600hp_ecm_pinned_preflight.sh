@@ -43,5 +43,16 @@ for p in "$patchdir"/*.patch \
   fi
   echo "ECM_PATCH=PASS $name sha256=$(sha256sum "$p" | cut -d' ' -f1)"
 done
+# Record how the pinned ECM NSS IPv4 frontend populates VLAN create fields.
+# Strings here are evidence of the source ABI, NOT evidence of firmware ACK.
+for token in NSS_IPV4_RULE_CREATE_VLAN_VALID vlan_primary_rule vlan_secondary_rule; do
+  matches="$(grep -Rn -F --include='*.c' --include='*.h' "$token" "$src/frontends/nss" | head -n 6 || true)"
+  if [ -z "$matches" ]; then
+    echo "ECM_IPV4_VLAN_RULE=REVIEW missing token $token"
+  else
+    echo "ECM_IPV4_VLAN_RULE=FOUND token=$token"
+    printf '%s\n' "$matches"
+  fi
+done
 echo "ECM_STAGED_APPLY=PASS exact source + OpenWrt patch order + staged 760-04/05"
 echo "ECM_SCOPE=SOURCE_APPLY_ONLY NO_ARM_BUILD NO_BOOT NO_NSS_ACK"

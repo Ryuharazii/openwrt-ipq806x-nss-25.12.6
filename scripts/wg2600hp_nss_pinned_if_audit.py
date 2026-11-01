@@ -200,6 +200,60 @@ def log_pinned_path_contract(src, category):
                 emit(f"PIN_IF_CONTRACT_LINE {relative}:{i+1}: {content[i][:190]}")
     emit(f"PIN_IF_CONTRACT=INSPECTED {category} source only; firmware behavior unknown")
 
+
+def audit_ipv4_vlan_rule_contract(source):
+    # Probe the exact 3cfb9f43 NSS IPv4 message ABI, independent of
+    # NSS_DRV_VLAN_ENABLE (the VLAN interface module). This is not FW proof.
+    header = source / "exports/nss_ipv4.h"
+    if not header.is_file():
+        emit("IPV4_RULE_ABI=FAIL exact source exports/nss_ipv4.h missing")
+        return False
+    lines = header.read_text(encoding="utf-8", errors="replace").splitlines()
+    needles = (
+        "NSS_IPV4_RULE_CREATE_VLAN_VALID",
+        "struct nss_ipv4_vlan_rule",
+        "vlan_primary_rule",
+        "vlan_secondary_rule",
+        "struct nss_ipv4_rule_create_msg",
+    )
+    for token in needles:
+        found = [(i+1, line.strip()) for i, line in enumerate(lines) if token in line]
+        if not found:
+            emit(f"IPV4_RULE_ABI=FAIL missing {token}")
+            return False
+        for line, value in found[:4]:
+            emit(f"IPV4_RULE_ABI_SYMBOL=FOUND exports/nss_ipv4.h:{line} {value[:180]}")
+    ipv4_sources = sorted(source.glob("nss_ipv4*.c"))
+    for path in ipv4_sources:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        for i, line in enumerate(lines):
+            if "NSS_DRV_VLAN_ENABLE" in line or "NSS_IPV4_TX_CREATE_RULE_MSG" in line:
+                emit(f"IPV4_PATH_CONTEXT {path.name}:{i+1}: {line.strip()[:170]}")
+    emit("IPV4_RULE_ABI=PASS IPv4 VLAN fields present in driver ABI; FW acceptance unknown")
+    return True
+
+def audit_firmware_package_identity():
+    # Metadata only: no binary disassembly/reverse engineering.
+    base = ROOT / "package/qca-nss/qca-nss-drv/files/nss-firmware"
+    import hashlib
+    version = (base / "nss_fw_version.h").read_text(encoding="utf-8")
+    readme = (base / "README.md").read_text(encoding="utf-8")
+    if not all(x in version for x in ("#define NSS_FW_VERSION_MAJOR 11",
+                                      "#define NSS_FW_VERSION_MINOR 4")):
+        emit("NSS_FIRMWARE_MANIFEST=FAIL version metadata mismatch")
+        return False
+    if "Synology RT2600ac" not in readme:
+        emit("NSS_FIRMWARE_MANIFEST=FAIL provenance metadata changed")
+        return False
+    for name in ("qca-nss0-retail.bin", "qca-nss1-retail.bin"):
+        file = base / name
+        if not file.is_file() or file.stat().st_size < 100000:
+            emit(f"NSS_FIRMWARE_MANIFEST=FAIL missing/short {name}")
+            return False
+        emit(f"NSS_FIRMWARE_FILE=IDENTIFIED {name} size={file.stat().st_size} sha256={hashlib.sha256(file.read_bytes()).hexdigest()}")
+    emit("NSS_FIRMWARE_MANIFEST=PASS provenance and hashes only, protocol parser capability NOT verified")
+    return True
+
 def main():
     drv_cfg = (ROOT / "package/qca-nss/qca-nss-drv/Config.in").read_text()
     wg_cfg = (ROOT / "diff-wg2600hp-nss").read_text()
@@ -221,6 +275,10 @@ def main():
                 return 21
             print_evidence(path, key)
             log_pinned_path_contract(path, key)
+            if key == "drv" and not audit_ipv4_vlan_rule_contract(path):
+                return 23
+    if not audit_firmware_package_identity():
+        return 24
     emit("PIN_SOURCE_AUDIT=PASS exact pinned source + package patches inspected")
     emit("PIN_SOURCE_SCOPE=SOURCE_ONLY NO_FW_PARSER_PROOF NO_ARM_BUILD NO_BOOT NO_NSS_CREATE_ACK")
     return 0
