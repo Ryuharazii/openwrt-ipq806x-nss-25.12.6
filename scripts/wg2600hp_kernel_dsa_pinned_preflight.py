@@ -7,6 +7,7 @@ a kernel compile, boot test, or NSS hardware proof.
 """
 from pathlib import Path
 import hashlib
+import difflib
 import subprocess
 import sys
 import tempfile
@@ -94,6 +95,49 @@ def run():
             print(f"DSA_76001_GNU_{label}={'PASS' if extra.returncode == 0 else 'FAIL'}", flush=True)
             if extra.returncode:
                 print(extra.stdout[-350:], flush=True)
+        # Regenerate only the 760-01 diff from the exact upstream files
+        # after git apply, then test a canonical GNU unified diff at fuzz=0.
+        # This is a diagnostic, NOT an automatic substitution or source build.
+        with tempfile.TemporaryDirectory(prefix="wg2600hp-canonical-") as modified_dir:
+            modified = Path(modified_dir)
+            for path in UPSTREAM_BLOBS:
+                q = modified / path
+                q.parent.mkdir(parents=True, exist_ok=True)
+                q.write_bytes((scratch / path).read_bytes())
+            applied = subprocess.run(
+                ["git", "-C", str(modified), "apply", "-p1", str(stage_one)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+            print(f"DSA_76001_GIT_APPLY_ACTUAL={'PASS' if applied.returncode == 0 else 'FAIL'}", flush=True)
+            if applied.returncode:
+                print(applied.stdout[-3000:], flush=True)
+            else:
+                target_files = [
+                    "include/net/dsa.h", "net/dsa/Kconfig", "net/dsa/Makefile",
+                    "net/dsa/tag_qca_8021q.c",
+                ]
+                canonical = ""
+                for path in target_files:
+                    original = scratch / path
+                    revised = modified / path
+                    old = original.read_text(encoding="utf-8").splitlines(keepends=True) if original.exists() else []
+                    new = revised.read_text(encoding="utf-8").splitlines(keepends=True)
+                    if old != new:
+                        canonical += "".join(difflib.unified_diff(
+                            old, new, fromfile="a/" + path if original.exists() else "/dev/null",
+                            tofile="b/" + path, n=3))
+                candidate = modified / "760-01-generated.patch"
+                candidate.write_text(canonical, encoding="utf-8")
+                rebuilt = subprocess.run(
+                    ["patch", "--directory", str(scratch), "-p1", "--batch",
+                     "--forward", "--dry-run", "--fuzz=0", "--input", str(candidate)],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+                print(f"DSA_76001_CANONICAL_GNU_F0={'PASS' if rebuilt.returncode == 0 else 'FAIL'}", flush=True)
+                if rebuilt.returncode:
+                    print(rebuilt.stdout[-3500:], flush=True)
+                else:
+                    print("DSA_76001_CANONICAL_PATCH_BEGIN", flush=True)
+                    print(canonical.rstrip("\n"), flush=True)
+                    print("DSA_76001_CANONICAL_PATCH_END", flush=True)
         print(f"DSA_76001_STOCK_DRY_RUN={'PASS' if dry.returncode == 0 else 'FAIL'}", flush=True)
         if dry.returncode:
             print(dry.stdout[-2500:], flush=True)
