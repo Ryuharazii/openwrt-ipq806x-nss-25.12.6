@@ -291,3 +291,13 @@
 - **起動時モジュール・ECM初期化の実ファイル**: initramfsの `etc/modules.d/31-qca-nss-gmac` → `32-qca-nss-drv` → `60-qca-nss-drv-tunipip6` の各ファイル内容を読み取った。ECM初期UCI値は `auto` だが、収録されている `etc/uci-defaults/99-wg2600hp-nss-ecm` が対象機種で `ecm.global.acceleration_engine='nss'` に設定し、`/etc/init.d/qca-nss-ecm` をenableする。 `etc/rc.d/S96wg2600hp-nss-ecm` へのシンボリックリンクも収録。ただし **UCI defaults実行時刻・ECM起動成功・トンネルIF生成/ACKは新規実機ログ未取得**。
 - **横断確認範囲**: Linux側のRAMイメージから起動用ファイルとNSS呼出し関係まで照合した。**電源投入/Boot ROM/U-Bootの一連の実機ログは未取得**。旧RAM起動→WAN DHCP→LAN→WAN IPv4疎通は既存G5ログPASS。ECM `FAIL_RULE=-2` / DSA AE IF `-1` は既存G6 FAIL。Wi-Fiと固定IPIP6の実機NSS統計増分は未確認。したがって **G1全経路未確認、G2未確認、G3 FAIL** を維持し、ビルド/書込みなし。
 - **次の焦点**: 既知の旧ZIPを再検査し続けず、ECM/DSAの隔離候補の安全性と起動経路・後続影響を満たしてから統合。既存の `wg2600hp-net-audit` はboard_name照合を含む読み取り専用の検証スクリプト。Ubuntuでの誤実行を実機の証拠に数えない。
+
+## 2026-11-01 隔離DSA失敗時復旧の実体修正候補（760-08/09、ビルド禁止継続）
+
+- **実際に作成・GitHub読戻し確認した隔離ファイル**:
+  - `backports/staging/760-08-net-dsa-8021q-prefix-unwind-6.12-CANDIDATE.patch` — commit `42771824aa8c10bb378dd9122810ab34129f4b28`、blob `d51eb5823fb3171b948f4e6ff95dc1e269d0622e`。
+  - `backports/staging/760-09-net-dsa-qca8k-bridge-join-unwind-6.12-CANDIDATE.patch` — commit `bee214fa1e4cae287bf8ad8f9747d0fd068686f6`、blob `e23075ff3a73fecf4a564f5c085078fcc85da713`。
+- **760-08 根拠**: Linux v6.12.112 `net/dsa/tag_8021q.c` に既存隔離760-03→760-06をメモリ上で適用した後、追加3ハンクを再適用して予想ソースと完全一致。初期化失敗時に成功済みポートのみ逆順解放、conduit `vlan_vid_add()` 失敗時に当該ポートのVLANを解放、失敗した登録contextをNULLに戻して解放。簡易状態モデルは6/6一致（**実カーネル実行テストではない**）。
+- **760-09 根拠**: Linux v6.12.112 `qca8k-common.c` に実OpenWrt 711-01（1ハンク）→隔離760-02（16ハンク）をメモリ上適用し、追加1ハンクを再適用して予想ソースと完全一致。失敗した `qca8k_port_bridge_join()` で `qca8k_update_port_member(..., false)` を試行し、復旧エラーはログ化。Linux `dsa_port_bridge_join()` はJOIN通知失敗時にLEAVE通知を発しないためドライバ側復旧が必要。
+- **未解決**: `dsa_switch_tag_8021q_vlan_add()` はCPU/ユーザーポートに対する複数hardware writeの途中失敗を完全に巻き戻さない。 `dsa_tag_8021q_bridge_join()` は旧standalone VLAN削除エラーを確認しない。MDIO/VTUエラー時のhardware rollback、CPU0/6分離・FDB/洪水制御・DHCP・MTU・ECM AE IF階層、Wi-Fi NSS/固定IPIP6 FW ACKは実機で未実証。差分一致・簡易モデルを起動試験PASSとは扱わない。
+- **判定**: G1/G2未確認、G3 FAIL。760-08/09は**stagingの候補ファイルのみ**であり `target/linux/generic/pending-6.12` への本統合、ARMビルド、QEMU/実機起動、フラッシュはいずれも行っていない。旧ZIPの再検査を繰り返さず、残るbroadcast VLAN部分復旧とデータパスを横断照合する。
