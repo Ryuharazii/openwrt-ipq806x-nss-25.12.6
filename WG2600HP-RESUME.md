@@ -128,3 +128,8 @@
 
 - Active source-assembled candidate: `wg2600hp-nss-integrated-candidate-20261101` HEAD検証`ab9a24f64b7d2e6dd5a77c9c132aec1ac89a0d7c`。初回組込み検査 [#41276859700](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41276859700)、新VLAN/PVID復旧候補付き594パッチ完全ソース適用PASS [#41277303359](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41277303359)。パッチ実体は`target/linux/generic/pending-6.12/760-12-net-dsa-qca8k-vlan-rollback-CANDIDATE.patch`。ステージにも同じ実体を保存。
 - Next actual blocker: C/ARM compile and fault-injection proof of `760-12` and switch recovery, without assuming MDIO errors are always recoverable; assess G1 BootROM/U-Boot and changed runtime regression; no new firmware build/flash without gate. G1/G2 incomplete, G3 FAIL.
+
+## 2026-11-01 第27セッション最新証拠
+
+- Active隔離統合ブランチ`wg2600hp-nss-integrated-candidate-20261101`、実行コミット`5cde09a756e5f1eb5a33e6e860c84f0dec6d27a7`、[Actions #41279782972](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279782972) job124769154671 completed/success。OpenWrt594本、ARM DSA4/4実オブジェクト、実パッチ後`qca8k-common.c`のC関数を抽出した模擬故障8/8がPASS。これは以前までなかった実コンパイルと失敗注入実測。
+- **残るG2範囲**は実MDIO I/O復旧保証、CPU0/6 L2分離、ECM NSS IPv4 CREATE/ACK、Wi-Fi、TUNIPIP6、DSA MTU。G1は旧RAM起動部分PASS、新イメージとBootROM/U-Boot全ログ未確認。G3 FAIL、ファーム全体のビルド/実機RAM起動/フラッシュ無し。通常ブランチは不変。

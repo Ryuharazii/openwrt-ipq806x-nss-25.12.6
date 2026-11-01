@@ -41,3 +41,8 @@ Prior to its actual run result, ARM compilation remains UNKNOWN.
 
 - Actual [Actions #41279538678](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279538678), verified completed/success. Linux6.12.112 + all594 patches compiled four real ARM ELF objects: tag_qca_8021q.o 5340B, tag_8021q.o 9024B, qca8k-common.o 21220B, qca8k-8xxx.o 33700B. No firmware linking or RAM boot.
 - Separate stubbed register/VTU C harness compiles actual extracted patched qca8k C function bodies and injects failures at first and second PVID writes, new/existing VLAN registration, partial VTU add and rollback failure. Model is **not actual switch fault injection**; it only validates deterministic code-level behavior and demonstrates rollback can fail. Newly added; CI not yet confirmed.
+
+## Validated ARM compiler and mocked C fault-injection evidence
+
+- CI [#41279782972](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279782972) PASS at `5cde09a756e5f1eb5a33e6e860c84f0dec6d27a7`: all 594 patches applied to pinned Linux6.12.112, four real ARM DSA objects built and verified as ARM ELF, and eight modeled failure/success cases using original patched C functions pass. This **does not** prove hardware rollback or full firmware integration.
+- G1 incomplete; G2 static/ARM/modeled coverage improved, hardware/unwind/offload not closed; G3 FAIL. Do not flash.
