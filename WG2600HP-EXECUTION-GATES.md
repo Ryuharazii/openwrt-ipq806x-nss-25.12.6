@@ -416,3 +416,9 @@
 - 対象コミット `ef7663b56bbf34123164bf6cf81ccd5ad2d7b756`、機種 WG2600HP/IPQ8064、GitHub Actions [41272860330](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41272860330) を2026-11-01確認：`completed/success`。同一ジョブ `staging-host-only` の各ステップすべて `success`、ジョブログから `HOST_SOURCE_SYNC=PASS`、DSAタグ模擬 `12 PASS/0 FAIL`、旧760-10負例 `FAIL VLAN-aware routed`（期待通り）、ネット診断8テスト `OK`、ECM新ガード6テスト `OK` を確認。
 - **PASSの範囲**：GitHub host runner のソース文字列整合、C模擬動作、Python unittestのガード検出。760-04の実pinned ECM適用・Linux6.12 ARMコンパイル、DSA/FDB/VTU、NSS firmware CREATE/ACK、RAM実機IPv4、Wi-Fi、固定IPIP6の検証ではない。
 - G1：起動全経路未完、G2：修正版の実後続回帰未完、**G3 FAIL・ARMファームビルド禁止**。診断・隔離候補以外の通常作業ブランチ、WAN/LAN設定、ユーザー用VLANに変更なし。
+
+## 2026-11-01 第22セッション：固定ECM原本の順次適用ゲートを隔離追加（未実行）
+
+- 対象WG2600HP/IPQ8064、ソース固定SHA `9acdcb05c04ae177a79c4c34cef0487fbcedbfaa`。公開類似ミラーの`ecm_interface.c`を照合したが、`everything411/qsdk`は旧7ハンクのうち5件、`felix-fly/qsdk-12`は6件の文脈一致にとどまり、両者とも**固定版の証拠にはできない**。
+- `scripts/wg2600hp_ecm_pinned_preflight.sh`を追加し、CIの一時領域で公式pinをfetch→HEAD SHA検証→`100/115/200/210/215/220/300/400/401`→隔離`760-04/05`の順番で`patch --fuzz=0 -p1`適用。原本が取得できない場合は**BLOCKED（exit20）**、不一致の場合はFAIL（exit21）。実際に順番を保ったソース適用であり、ファームビルドはしない。
+- 既存の隔離ホスト専用workflowに限定して起動。CIログ確認前にPASSを付けない。通常作業ブランチとネットワーク/VLAN構成は変更しない。電源投入→起動・ARMコンパイル・NSS FWタグ処理・CREATE/ACK・Wi-Fi・IPIP6は依然未確認。**G1/G2未完、G3 FAIL、新FWビルド・書込み不可**。

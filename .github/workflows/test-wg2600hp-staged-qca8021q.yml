@@ -35,5 +35,7 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_wg2600hp_net_audit_gate.py' -v
       - name: ECM VLAN-aware fail-closed staging regression (host only)
         run: python3 -m unittest discover -s tests -p 'test_wg2600hp_ecm_8021q_guard.py' -v
+      - name: Exact pinned ECM patch-chain preflight (source only)
+        run: bash scripts/wg2600hp_ecm_pinned_preflight.sh
       - name: Explicit scope boundary
         run: echo "HOST-ONLY PASS does not establish ARM kernel build, boot, IPv4 or NSS offload."
