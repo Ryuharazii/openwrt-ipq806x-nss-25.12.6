@@ -70,6 +70,7 @@ jobs:
           test "$bad" -eq 0
       - name: Configure WG2600HP only
         run: |
+          cd "$SRC"
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           unzip -o VHTNSS.zip
@@ -82,14 +83,18 @@ jobs:
           cp .config wg2600hp-resolved.config
 
       - name: Download source archives
-        run: make -j8 download
+        run: |
+          cd "$SRC"
+          make -j8 download
 
       - name: Build firmware
         run: |
+          cd "$SRC"
           timeout 2h bash -c 'make -j$(nproc) || make -j1 V=s' 2>&1 | tee build.log
 
       - name: Verify and stage WG2600HP images
         run: |
+          cd "$SRC"
           mkdir -p out
           find bin/targets/ipq806x/generic -maxdepth 1 -type f -name '*nec_wg2600hp-*' -exec cp {} out/ \;
           test -n "$(find out -maxdepth 1 -type f -name '*.bin' -o -name '*initramfs*')"
