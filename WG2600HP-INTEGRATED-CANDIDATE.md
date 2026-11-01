@@ -78,3 +78,19 @@ This is a **build candidate, not a release or proof of NSS acceleration**.
 The ordinary branch and running device remain untouched. G1/G2 hardware
 conditions remain incomplete; G3 release/flash eligibility FAIL. Do not
 describe an initiated run as an image until artifacts actually exist.
+
+## 2026-11-01 — user cancellation and Wi-Fi NSS exception-path correction
+
+The user cancelled all 3 attempts of Actions run 41282107153.
+No firmware was built; do not restart or overwrite the user's cancelled
+full-build workflow. At branch HEAD c9b7d7fcf5e50250747fdfed9eea33f0d8a4134d, the user has replaced
+`.github/workflows/build-wg2600hp-nss.yml` with an empty file.
+Respect this change while working on the actual NSS integration.
+
+Fixed a concrete mac80211 NSS exception-path bug: the
+`receive_from_nss()` callback dereferenced `napi` unconditionally.
+It now uses NAPI GRO only when the callback receives a NAPI context,
+and otherwise delivers the packet using `netif_receive_skb()`.
+A regression check was added. This fixes a source-level Wi-Fi
+compatibility hazard, **not** full wired/Wi-Fi/tunnel NSS integration,
+and is not a tested kernel image or a reason to auto-build.

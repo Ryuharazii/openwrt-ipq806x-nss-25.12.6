@@ -161,6 +161,16 @@ def main():
           and "skb_push(skb, ETH_HLEN)" in rx_redirect
           and 0 <= tx_call < fallback_pull < stack_fallback
           and "+\t\tskb_pull(skb, ETH_HLEN);" in rx_redirect)
+    # NSS exception packets must retain a host-stack path without NAPI.
+    exception_start = wifi_redirect.find("+static void receive_from_nss(")
+    exception_end = wifi_redirect.find(" /*", exception_start)
+    exception = wifi_redirect[exception_start:exception_end] if (
+        exception_start >= 0 and exception_end > exception_start) else ""
+    check("Wi-Fi NSS exception handles absent NAPI context",
+          "+\tif (napi)" in exception
+          and "+\t\tnapi_gro_receive(napi, skb);" in exception
+          and "+\telse" in exception
+          and "+\t\tnetif_receive_skb(skb);" in exception)
     # The NSS TX QoS helper runs before the 802.3 xmit length check.
     # Check that the helper bounds all header reads to the linear skb.
     tx_helper_start = wifi_redirect.find("+static void ieee80211_xmit_nss_fixup(")

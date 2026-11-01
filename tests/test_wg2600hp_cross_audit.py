@@ -119,6 +119,19 @@ class CrossAuditTest(unittest.TestCase):
             result.stdout,
         )
 
+    def test_detects_wifi_nss_exception_missing_napi_fallback(self):
+        self.mutate(
+            "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
+            "if (napi)",
+            "if (napi_unchecked)",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Wi-Fi NSS exception handles absent NAPI context",
+            result.stdout,
+        )
+
     def test_detects_wifi_nss_tx_short_ethernet_bounds(self):
         self.mutate(
             "package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch",
