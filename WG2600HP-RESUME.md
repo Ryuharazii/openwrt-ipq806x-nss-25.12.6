@@ -81,3 +81,9 @@
 - 今回、11月1日ZIPの `qca-nss-tunipip6.ko` を `llvm-objdump` で実解析し、`ARPHRD_TUNNEL6` の `NETDEV_UP/NETDEV_DOWN` 分岐を確認。NSS/GMAC/tunipip6のmodule読込み設定、ECM UCI defaultsからNSS選択・S96起動への実ファイル経路も確認済み。証拠を `WG2600HP-EXECUTION-GATES.md` commit `0bf1e749ebb9f5898784c045963b9863b54e8022` に記録。
 - **振り出しに戻らない**: 通信できる旧ファームの `MAC80211_NSS_SUPPORT`、`TUNIPIP6`、DTBハイフン・アンダーバー問題を再調査対象にしない。組込みは確認済み、必要なのは**有線ECM/DSA NSS IFマッピング・Wi-Fi NSS redirectの実パケット・固定IPIP6 NSS FW ACKと統計増分の証明**。
 - **未通過**: 電源投入～U-Boot全ログ、隔離変更後の下流回帰、実ARMコンパイル、新RAM起動/実機高速化。**G1/G2未完了、G3 FAIL、ビルド不可**。完成宣言をしない。次は既存差分の統合前条件を網羅してから最小変更・回帰検証へ進む。ユーザーに以前の出力・ZIPの再説明を求めない。
+
+## 2026-11-01 第21セッション追記：隔離DSA失敗復旧候補を新規保存
+
+- `760-08-net-dsa-8021q-prefix-unwind-6.12-CANDIDATE.patch`（commit `42771824`）: tag_8021q登録途中失敗で成功済みのポートのみ逆順解放し、RX VLANフィルター登録エラーを確認。元Linux v6.12.112→760-03→760-06→760-08の**メモリ上差分再適用一致**。簡易モデル6件一致。**実カーネル未実行**。
+- `760-09-net-dsa-qca8k-bridge-join-unwind-6.12-CANDIDATE.patch`（commit `bee214fa`）: DSA bridge JOIN通知失敗時のQCA8337ポートmembership復元を試行。元Linux→711-01→760-02→760-09の**メモリ上差分再適用一致**。MDIO再失敗時には残留リスク。
+- **次はこれらの局所結果を全経路PASSと誤認しない**。`dsa_switch_tag_8021q_vlan_add` 複数ポート途中失敗の部分復旧、bridge joinのstandalone VLAN削除エラー、CPU0/6 WAN/LAN分離、ECM pinned 760-04/05、NSS実機を横断評価。現状 **G1/G2未確認、G3 FAIL。新ビルド/実機書込み禁止**。
