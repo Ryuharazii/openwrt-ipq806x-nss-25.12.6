@@ -50,6 +50,7 @@ def main():
     gmac_patch = read("target/linux/ipq806x/patches-6.12/990-0001-Add-required-entries-in-dts-files-for-NSS-support.patch")
     gmac_api = read("package/qca-nss/qca-nss-gmac/patches/02-kernel-5.15-support.patch")
     dsa_conduit = read("package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch")
+    gmac_dsa_mtu = read("package/qca-nss/qca-nss-gmac/patches/10-wg2600hp-nss-gmac-dsa-mtu-6.12.patch")
     config = read("diff-wg2600hp-nss")
     image_gate = read("scripts/wg2600hp_nss_image_gate.sh")
     image_verifier = read("scripts/wg2600hp_verify_embedded_dtb.py")
@@ -71,6 +72,15 @@ def main():
           "+\tof_get_phy_mode(np, &gmaccfg->phy_mii_type);" in gmac_api)
     check("NSS GMAC exposes OF node for DSA conduit matching",
           "+\tnetdev->dev.of_node = pdev->dev.of_node;" in dsa_conduit)
+
+    # Linux 6.12 ether_setup() defaults max_mtu to 1500, but the
+    # selected QCA 802.1Q DSA tagger requires a 4-byte conduit overhead.
+    # This source guard does not prove NSS FW accepted the larger MTU.
+    check("WG2600HP NSS-GMAC conduit permits four-byte internal tag only",
+          '+#include <linux/if_vlan.h>' in gmac_dsa_mtu
+          and '+\tif (of_machine_is_compatible("nec,wg2600hp"))' in gmac_dsa_mtu
+          and '+\t\tnetdev->max_mtu = ETH_DATA_LEN + VLAN_HLEN;' in gmac_dsa_mtu
+          and '+\tnetdev->mtu =' not in gmac_dsa_mtu)
 
     # 2. Follow the entire CPU link: DSA port -> GMAC -> fixed link.
     mdio = node(dts, r"&mdio0")
