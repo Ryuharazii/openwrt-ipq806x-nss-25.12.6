@@ -102,6 +102,20 @@ if [ "$#" -eq 2 ] && [ "$1" = "--arm-kernel" ]; then
       exit 33
     fi
   done
+  # Mirror qca-nss-drv/Makefile's Build/Configure for ipq806x.
+  # The raw pin intentionally lacks generated exports/nss_arch.h.
+  if [ ! -f "$drv/exports/arch/nss_ipq806x.h" ]; then
+    echo "ECM_NSS_CONFIGURE=FAIL missing pinned exports/arch/nss_ipq806x.h"
+    exit 37
+  fi
+  if [ -e "$drv/exports/nss_arch.h" ]; then
+    echo "ECM_NSS_CONFIGURE=FAIL nss_arch.h unexpectedly exists"
+    exit 38
+  fi
+  ln -s arch/nss_ipq806x.h "$drv/exports/nss_arch.h"
+  cp "$root/package/qca-nss/qca-nss-drv/files/nss-firmware/nss_fw_version.h" "$drv/exports/nss_fw_version.h"
+  sed -i 's/define NSS_FW_VERSION_MAJOR.*/define NSS_FW_VERSION_MAJOR 11/' "$drv/exports/nss_fw_version.h"
+  echo "ECM_NSS_CONFIGURE=PASS generated ipq806x arch header and firmware version include"
   echo "ECM_ARM=START pinned ECM with NSS front-end and DSA VLAN enabled"
   for obj in ecm_interface.o frontends/nss/ecm_nss_ported_ipv4.o; do
     if ! make -C "$kernel" -j2 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- M="$src" ECM_INTERFACE_VLAN_ENABLE=y ECM_NON_PORTED_SUPPORT_ENABLE=y ECM_FRONT_END_NSS_ENABLE=y ECM_IPV6_ENABLE=y SoC=ipq806x EXTRA_CFLAGS="-I$drv/exports -I$src/exports" "$obj" > "$tmp/ecm-arm.log" 2>&1; then
