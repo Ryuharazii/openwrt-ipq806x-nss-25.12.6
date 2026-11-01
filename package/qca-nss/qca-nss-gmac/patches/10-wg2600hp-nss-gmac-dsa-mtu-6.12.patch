@@ -1,0 +1,44 @@
+From: WG2600HP / IPQ8064 / OpenWrt 25.12.6
+Subject: [PATCH] nss-gmac: allow QCA8337 DSA CPU tag overhead on WG2600HP only
+
+Linux 6.12 ether_setup() initializes max_mtu=ETH_DATA_LEN (1500), and
+alloc_etherdev() inherits this limit. The QCA8337 DSA conduit increases
+the master MTU by the length of the internal tag. The previous RAM image
+reported eth0/eth1 -EINVAL while raising conduit MTU to 1502 with the
+legacy QCA tag. The integrated qca-8021q tagger requires VLAN_HLEN=4.
+
+Set the maximum permissible conduit MTU to 1504 on the WG2600HP only.
+Keep the configured MTU and all other boards unchanged. The existing
+nss_gmac_change_mtu() / NSS physical data-plane operation remains
+responsible for actually accepting the requested MTU; firmware
+acceptance and throughput remain hardware-test requirements.
+
+The matching context was checked against a public nss-gmac reference;
+exact pinned 17176794 source patch application and ARM compile still
+require independent verification. Not a firmware build or G2 PASS.
+
+--- a/ipq806x/nss_gmac_ctrl.c
++++ b/ipq806x/nss_gmac_ctrl.c
+@@ -37,4 +37,5 @@
+ #include <linux/workqueue.h>
+ #include <linux/phy.h>
+ #include <linux/net_tstamp.h>
++#include <linux/if_vlan.h>
+ #include <asm/div64.h>
+@@ -1175,7 +1176,16 @@
+ 	netdev = alloc_etherdev(sizeof(struct nss_gmac_dev));
+ 	if (!netdev) {
+ 		pr_info("%s: alloc_etherdev() failed\n", __func__);
+ 		return -ENOMEM;
+ 	}
+ 
++
++#ifdef CONFIG_OF
++	/* DSA qca-8021q adds a four-byte tag on both CPU conduits.
++	 * Permit only the tag overhead, not a user-facing jumbo MTU.
++	 */
++	if (of_machine_is_compatible("nec,wg2600hp"))
++		netdev->max_mtu = ETH_DATA_LEN + VLAN_HLEN;
++#endif
++
+ 	gmacdev = netdev_priv(netdev);
