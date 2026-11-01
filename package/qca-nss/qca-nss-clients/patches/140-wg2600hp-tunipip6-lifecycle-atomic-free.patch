@@ -1,0 +1,107 @@
+From: WG2600HP 25.12.6 integration
+Subject: [PATCH] tunipip6: do not vfree vmalloc memory under spinlock; stop notifier before teardown
+
+Fixed IPIP6 NSS lifecycle: detach the instance while holding the list lock,
+then release it before vfree(). Quiesce NETDEV_UP/DOWN callbacks before freeing
+NSS tunnel interfaces during module unload. The original source held
+spin_lock_bh() across vfree(), which can sleep. This is a Linux lifecycle
+correction, not proof of FW ACK or accelerated tunnel throughput.
+
+--- a/tunipip6/nss_connmgr_tunipip6.c
++++ b/tunipip6/nss_connmgr_tunipip6.c
+@@ -90,14 +90,12 @@
+  *
+  * Note: tunnel list lock is expected to be held by the caller.
+  */
+-static void nss_tunipip6_free_instance(struct nss_tunipip6_instance *ntii)
+-{
+-	if (!list_empty(&ntii->list)) {
+-		list_del(&ntii->list);
+-	}
+-
+-	vfree(ntii);
+-}
++static void nss_tunipip6_unlink_instance(struct nss_tunipip6_instance *ntii)
++{
++	if (!list_empty(&ntii->list)) {
++		list_del(&ntii->list);
++	}
++}
+ 
+ /*
+  * nss_tunipip6_find_instance()
+@@ -138,10 +138,11 @@
+ 		return NSS_CONNMGR_TUNIPIP6_CONTEXT_FAILURE;
+ 	}
+ 
+-	dentry = ntii->dentry;
+-	nss_tunipip6_free_instance(ntii);
+-	spin_unlock_bh(&tunipip6_ctx.lock);
+-	debugfs_remove(dentry);
++	dentry = ntii->dentry;
++	nss_tunipip6_unlink_instance(ntii);
++	spin_unlock_bh(&tunipip6_ctx.lock);
++	vfree(ntii);
++	debugfs_remove(dentry);
+ 	dev_put(netdev);
+ 	return NSS_CONNMGR_TUNIPIP6_SUCCESS;
+ }
+@@ -1061,11 +1061,12 @@
+ 		}
+ 
+ 		netdev = ntii->dev;
+-		dentry = ntii->dentry;
+-		nss_tunipip6_free_instance(ntii);
+-		spin_unlock_bh(&tunipip6_ctx.lock);
+-
+-		dev_put(netdev);
++		dentry = ntii->dentry;
++		nss_tunipip6_unlink_instance(ntii);
++		spin_unlock_bh(&tunipip6_ctx.lock);
++		vfree(ntii);
++
++		dev_put(netdev);
+ 		debugfs_remove(dentry);
+ 		_nss_tunipip6_dyn_interface_destroy(netdev);
+ 
+@@ -1148,23 +1148,23 @@
+ 	}
+ #endif
+ 
+-	/*
+-	 * Free Host and NSS tunipip6 instances.
+-	 */
+-	nss_tunipip6_destroy_interface_all();
+-
+-	/*
+-	 * De-initialize debugfs.
+-	 */
+-	nss_tunipip6_stats_dentry_deinit();
+-
+-	/*
+-	 * Unregister net device notification for standard tunnel.
+-	 */
+-	if (!enable_custom) {
+-		unregister_netdevice_notifier(&nss_tunipip6_notifier);
+-		nss_tunipip6_trace("Netdev Notifier unregisterd\n");
+-	}
++	/*
++	 * Stop new NETDEV_UP/DOWN callbacks before tearing down NSS nodes.
++	 */
++	if (!enable_custom) {
++		unregister_netdevice_notifier(&nss_tunipip6_notifier);
++		nss_tunipip6_trace("Netdev Notifier unregisterd\n");
++	}
++
++	/*
++	 * Free Host and NSS tunipip6 instances.
++	 */
++	nss_tunipip6_destroy_interface_all();
++
++	/*
++	 * De-initialize debugfs.
++	 */
++	nss_tunipip6_stats_dentry_deinit();
+ 
+ 	/*
+ 	 * Unregister sysctl.

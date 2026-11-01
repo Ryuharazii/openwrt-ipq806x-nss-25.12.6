@@ -105,3 +105,14 @@ bundled firmware **header**. Other ipq806x device builds retain minor=2.
 The exact binary firmware's embedded revision/ABI and its behavior with
 the pinned NSS driver are not independently verified. This is a candidate
 source correction only. No auto build or flash has been initiated.
+
+## 2026-11-01 — fixed IPIP6 NSS lifecycle source correction
+
+Added active package patch `package/qca-nss/qca-nss-clients/patches/140-wg2600hp-tunipip6-lifecycle-atomic-free.patch` against the 11.4-style NSS clients
+tunipip6 implementation. Previous code called `vfree()` while holding
+`tunipip6_ctx.lock` in both the NETDEV_DOWN and module-exit paths; this is
+invalid for vmalloc-backed memory and can sleep in atomic context. Both paths
+now unlink under spinlock and free after releasing it. Module exit unregisters
+the netdevice notifier before tearing down NSS nodes. No change to live device
+or user's intentionally disabled full-build workflow. Build compatibility and
+FW tunnel acceleration are not yet established.
