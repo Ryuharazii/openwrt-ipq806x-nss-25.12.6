@@ -153,7 +153,7 @@ def main():
     mac80211_deps = mac80211.split("PKG_CONFIG_DEPENDS:= ", 1)
     mac80211_deps = mac80211_deps[1].split("\n\n", 1)[0] if len(mac80211_deps) == 2 else ""
     check("mac80211 NSS option changes package configuration stamp",
-          "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT" in mac80211_deps)
+          "CONFIG_PACKAGE_MAC80211_NSS_SUPPORT" in re.findall(r"CONFIG_[A-Za-z0-9_]+", mac80211_deps))
     check("mac80211 NSS virtual-interface redirect remains patched",
           "CPTCFG_MAC80211_NSS_SUPPORT" in wifi_redirect
           and "nss_virt_if_create_sync" in wifi_redirect
