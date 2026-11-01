@@ -13,9 +13,7 @@ Staging only: not integrated, compiled or tested on hardware.
 ---
 --- a/net/dsa/tag_8021q.c
 +++ b/net/dsa/tag_8021q.c
-@@ -443,9 +443,12 @@
- 		goto err_free;
- 
+@@ -445,7 +445,10 @@
  	return 0;
  
  err_free:

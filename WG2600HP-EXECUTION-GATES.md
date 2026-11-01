@@ -466,3 +466,9 @@
 - GitHub Actions [#41274228173](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274228173)：正規化760-01は`patch --fuzz=0`でPASS、既存711/712と760-02/03もPASS。次の隔離`760-06`が`net/dsa/tag_8021q.c`でFAIL。**760系全体はFAIL**。
 - 反復的な単一箇所修正を避けるため、選択した12パッチの全順序を変えず**各パッチをGNU --fuzz=0 dry-run→本適用**で審査。失敗時だけ、隔離CIの一時ソースでgit applyができるか別経路で検査し、続く候補の障害箇所も収集する。元→後の実ファイルから標準diffを生成し、別の一時領域でGNU strict dry-runできた場合のみ候補をログに出力。診断用git apply成功はGNUチェックの合格にすり替えず、途中1件でもGNU失敗なら**CI終了コード21 / FAIL**とする。候補内容はレビュー前に自動的に作業ソースへ統合しない。
 - これにより反復の負担を減らし、760-06/08/09/10/11などの不整合をまとめて洗い出す。フルOpenWrt patch tree、ARM build、起動、LAN→WAN、FW NSS CREATE/ACK、Wi-Fi/IPIP6は別ゲート。**G1/G2未完、G3 FAIL、FWビルド・フラッシュ禁止**。
+
+## 2026-11-01 第23セッション：760系後続11/12で厳格適用PASS、760-06再生成
+
+- GitHub Actions [#41274359761](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274359761)：Linux6.12.112実ソースへ既存711/712の4本＋隔離`760-01/02/03/06/08/09/10/11`の8本を順次適用。11/12はGNU `patch --fuzz=0` PASS。**唯一`760-06`はGNU strict FAIL**、ただし一時領域での`git apply` PASS、差分再生成後GNU strict dry-run PASS。後続`760-08/09/10/11`は、このdiagnostic git apply後の実ソース上でGNU strict PASS。テスト全体は期待どおりFAILのまま終了。
+- `760-06`だけ、実ソースから再生成されたcanonical diffに旧説明ヘッダーを保持して差し替え。旧新の追加行・削除行をソース文字列として照合一致（**変更内容は同一**）。次回CIの実適用を確認してから選択12本の合否を確定する。通常ブランチ、本体ARMカーネル、WAN/LAN設定・ユーザーVLANを変更しない。
+- **範囲**：素の上流Linux6.12.112での選択パッチに限定。OpenWrt他のgeneric pendingおよびtarget patchを全部含むテスト、ARM compile、Boot、RAM実機NSS/IPv4、Wi-Fi、固定IPIP6は未検証。G1/G2未完、**G3 FAIL**、新FWビルド/フラッシュ不可。
