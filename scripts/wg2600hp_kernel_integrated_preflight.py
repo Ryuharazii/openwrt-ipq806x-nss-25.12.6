@@ -171,6 +171,15 @@ def cross_compile_dsa_objects(linux):
             say(f"ARM_OBJECT=FAIL object is not ARM {obj}: {readelf.stdout[-1000:]}")
             return 39
         say(f"ARM_OBJECT=PASS {obj} size={artifact.stat().st_size} ELF_MACHINE=ARM")
+    test = subprocess.run([sys.executable,
+                           str(ROOT / "scripts/wg2600hp_qca8k_fault_inject.py"), str(linux)],
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, timeout=100, check=False)
+    say(test.stdout)
+    if test.returncode:
+        say(f"ARM_OBJECT_FAULT_INJECT=FAIL code={test.returncode}")
+        return 41
+    say("ARM_OBJECT_FAULT_INJECT=PASS modeled failures in exact selected C functions")
     say("ARM_OBJECT_CHAIN=PASS selected 4 objects compiled for ARM, NOT LINKED, NO FW, NO BOOT")
     return 0
 

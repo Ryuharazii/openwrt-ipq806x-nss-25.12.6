@@ -36,3 +36,8 @@ It never creates a WG2600HP firmware, modifies hardware, or declares G3 PASS.
 
 A newly added CI workflow will attempt this on the integrated isolated branch.
 Prior to its actual run result, ARM compilation remains UNKNOWN.
+
+## 2026-11-01 — compiled ARM objects PASS, add failure-model test
+
+- Actual [Actions #41279538678](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41279538678), verified completed/success. Linux6.12.112 + all594 patches compiled four real ARM ELF objects: tag_qca_8021q.o 5340B, tag_8021q.o 9024B, qca8k-common.o 21220B, qca8k-8xxx.o 33700B. No firmware linking or RAM boot.
+- Separate stubbed register/VTU C harness compiles actual extracted patched qca8k C function bodies and injects failures at first and second PVID writes, new/existing VLAN registration, partial VTU add and rollback failure. Model is **not actual switch fault injection**; it only validates deterministic code-level behavior and demonstrates rollback can fail. Newly added; CI not yet confirmed.
