@@ -158,6 +158,48 @@ def print_evidence(src, category):
                     # Output up to the first 4 fragments per file.
                     break
 
+def log_pinned_path_contract(src, category):
+    # Capture the actual fixed-pin control flow, not a similarly-named
+    # function in a different revision or target SoC.
+    specs = (
+        (
+            "drv",
+            "nss_cmn.c",
+            ("int32_t nss_cmn_get_interface_number_by_dev_and_type(",
+             "int32_t nss_cmn_get_interface_number_by_dev("),
+            24,
+        ),
+        (
+            "drv",
+            "nss_data_plane/nss_data_plane_gmac.c",
+            ("static bool nss_data_plane_register_to_nss_gmac(",
+             "nss_gmac_get_netdev_by_macid(if_num)"),
+            36,
+        ),
+        (
+            "gmac",
+            "ipq806x/nss_gmac_tx_rx_offload.c",
+            ("struct net_device *nss_gmac_get_netdev_by_macid("),
+            16,
+        ),
+    )
+    for owner, relative, needles, length in specs:
+        if category != owner:
+            continue
+        file = src / relative
+        if not file.is_file():
+            raise RuntimeError(f"PIN_IF_CONTRACT_FILE=MISSING {relative}")
+        content = file.read_text(encoding="utf-8", errors="replace").splitlines()
+        for needle in needles:
+            matches = [i for i, line in enumerate(content) if needle in line]
+            if len(matches) != 1:
+                raise RuntimeError(f"PIN_IF_CONTRACT=FAIL {relative} {needle!r} count={len(matches)}")
+            start = matches[0]
+            emit(f"PIN_IF_CONTRACT_CONTEXT {relative}:{start+1} symbol={needle}")
+            for i in range(start, min(len(content), start + length)):
+                emit(f"PIN_IF_CONTRACT_LINE {relative}:{i+1}: {content[i][:190]}")
+    emit(f"PIN_IF_CONTRACT=INSPECTED {category} source only; firmware behavior unknown")
+
 def main():
     drv_cfg = (ROOT / "package/qca-nss/qca-nss-drv/Config.in").read_text()
     wg_cfg = (ROOT / "diff-wg2600hp-nss").read_text()
@@ -178,6 +220,7 @@ def main():
                 emit(f"PIN_SOURCE_AUDIT=FAIL {package} patch chain")
                 return 21
             print_evidence(path, key)
+            log_pinned_path_contract(path, key)
     emit("PIN_SOURCE_AUDIT=PASS exact pinned source + package patches inspected")
     emit("PIN_SOURCE_SCOPE=SOURCE_ONLY NO_FW_PARSER_PROOF NO_ARM_BUILD NO_BOOT NO_NSS_CREATE_ACK")
     return 0

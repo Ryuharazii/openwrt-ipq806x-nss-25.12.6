@@ -523,3 +523,11 @@
 - 作業版Makefileでpinを再照合：qca-nss-drv `3cfb9f43`、qca-nss-gmac `171767947467662f2407d0cfff26dfb136c3fb4a`。対応する正確なCodelinaroコミットを取得、SHA照合後、各OpenWrt package/patchesを一時領域にstrict-fuzz0で適用して、`nss_cmn_get_interface_number_by_dev`、`subsys_dp_register`、`nss_gmac_get_netdev_by_macid`など物理IFの参照先を行番号付きで出力する`scripts/wg2600hp_nss_pinned_if_audit.py`を追加。ダウンロードや正確なSHA取得ができなければ BLOCKED としてPASS禁止。CIログ未確認の段階で正確なpinのコード詳細を断定しない。
 - 既存repoの`NSS_DRV_VLAN_ENABLE`はConfig.inでコメントアウト、`diff-wg2600hp-nss`にはenable指定なし。一方ECM標準variantの`ECM_INTERFACE_VLAN_ENABLE=y`はNSS VLANノード登録やFWが対応している証拠ではない。実パケットタグ受理の証拠は別途必要。
 - 通常作業ブランチ/ユーザーLAN/WAN/VLAN構成は変更せず、カーネル・FWビルド、RAM起動、実機書込みなし。**G1/G2未完、G3 FAIL**。
+
+## 2026-11-01 NSS IFソースの正確なpinを取得・適用した証拠
+
+- GitHub Actions [#41275468001](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41275468001)、ジョブ`124756651431` `completed/success`。NSSドライバのGitLab Codelinaro pinは短縮`3cfb9f43`をAPIによりフル`3cfb9f43536e77ae05a141cce18a242b85e834ab`へ復元し、その**実ソースコミットをgit checkoutで検証**。OpenWrt NSS driverパッチ`100/110/120/130/131/132/133/134/135`の**9/9 strict fuzz0適用PASS**。GMAC source pin`171767947467662f2407d0cfff26dfb136c3fb4a`のcheckout照合とGMAC package patch`00..09`の**10/10 strict fuzz0適用PASS**。
+- 固定pinの`nss_cmn.c:88`は`dev == nss_ctx->subsys_dp_register[i].ndev`時に`i`を返し、登録devが見つからなければ`-1`。同一pinの`nss_cmn_get_interface_number_by_dev()`は`nss_cmn_get_interface_number_by_dev_and_type(dev, 0)`へ委譲。`nss_data_plane/nss_data_plane_gmac.c:180`で`nss_gmac_get_netdev_by_macid(if_num)`を呼ぶ。`qca-nss-gmac`固定版の`ipq806x/nss_gmac_tx_rx_offload.c:1223`に対応関数の実装あり。**過去の類似R7800実装を現行pinと誤認せず、正しいソースで直接検証した**。
+- `CONFIG_NSS_DRV_VLAN_EXPOSED=NO`（package Config.inが`#config NSS_DRV_VLAN_ENABLE`とコメント化、WG2600HP選択設定に`...=y`なし）。ECM標準版でVLAN階層を扱えることと、NSS VLAN IF/FWが処理できることは別条件。
+- **未確定**：現行実機で登録されるnetdevとDSA user netdev/GMAC netdevの対応、ECMからNSSへの最終IFの割当、QCA 802.1Qタグの実FWデコード、VLAN内包NSSパケット、IPv4 CREATE/ACK。これらを実機で裏付けていない。従前RAM実測`AE IF=-1`/`NSS CREATE=0`は解消を主張しない。今回のソース監査で次段の具体契約をさらに抽出する診断を追加し、結果待ち。
+- G1/G2未完了、**G3 FAIL**。通常作業ブランチと既存WAN/LAN・ユーザーVLAN設定変更なし。ファームビルド・実機起動・フラッシュは未実施。
