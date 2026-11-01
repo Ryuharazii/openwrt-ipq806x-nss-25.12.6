@@ -67,6 +67,20 @@ def run():
              "--dry-run", "--fuzz=0", "--input", str(stage_one)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False,
         )
+        # Cross-check GNU patch result with git apply on the same untouched
+        # validated 6.12.112 upstream files. This must not auto-correct staging.
+        gitcheck = subprocess.run(
+            ["git", "-C", str(scratch), "apply", "--check", "-p1", str(stage_one)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+        print(f"DSA_76001_GIT_APPLY_CHECK={'PASS' if gitcheck.returncode == 0 else 'FAIL'}", flush=True)
+        if gitcheck.returncode:
+            print(gitcheck.stdout[-3000:], flush=True)
+        verbose = subprocess.run(
+            ["patch", "--directory", str(scratch), "-p1", "--verbose",
+             "--batch", "--forward", "--dry-run", "--fuzz=0", "--input", str(stage_one)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+        print(f"DSA_76001_GNU_VERBOSE={'PASS' if verbose.returncode == 0 else 'FAIL'}", flush=True)
+        print(verbose.stdout[-3000:], flush=True)
         print(f"DSA_76001_STOCK_DRY_RUN={'PASS' if dry.returncode == 0 else 'FAIL'}", flush=True)
         if dry.returncode:
             print(dry.stdout[-2500:], flush=True)
