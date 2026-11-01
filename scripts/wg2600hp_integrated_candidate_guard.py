@@ -23,6 +23,11 @@ def main():
         stage = R/"backports/staging"/n
         build = R/"target/linux/generic/pending-6.12"/n
         ck(stage.is_file() and build.is_file() and stage.read_bytes()==build.read_bytes(), n)
+    n="760-12-net-dsa-qca8k-vlan-rollback-CANDIDATE.patch"
+    src=R/"backports/staging"/n
+    dst=R/"target/linux/generic/pending-6.12"/n
+    ck(src.is_file() and dst.is_file() and src.read_bytes()==dst.read_bytes(),
+       "isolated PVID and VLAN rollback source candidate")
     for n in E:
         stage = R/"backports/staging"/n
         build = R/"package/qca-nss/qca-nss-ecm/patches"/n

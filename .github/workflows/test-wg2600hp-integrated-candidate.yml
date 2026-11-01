@@ -13,5 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify actual build source patch and configuration assembly
         run: python3 scripts/wg2600hp_integrated_candidate_guard.py
+      - name: Confirm actual assembled complete 6.12.112 kernel patch chain (no compile)
+        timeout-minutes: 10
+        run: python3 scripts/wg2600hp_kernel_integrated_preflight.py
       - name: Scope reminder
         run: echo "SOURCE ASSEMBLY CHECK ONLY. No ARM build, RAM boot, or NSS ACK."

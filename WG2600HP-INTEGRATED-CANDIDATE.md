@@ -15,3 +15,9 @@ Prior evidence: on the **audit branch**, fixed Linux 6.12.112 kernel tree accept
 **G3: FAIL.** Block firmware build pending critical prebuild safety/compile decision. Do not upgrade CI to hardware PASS.
 
 Known unresolved: 760-08/09 explicitly acknowledge switch VLAN partial hardware write rollback can fail. FW internal tag parser handling and NSS IPv4 CREATE/ACK not proven. User network configuration is not changed. No flash or automated firmware build.
+
+## 2026-11-01: selected G2 blocker addressed by isolated 760-12 candidate
+
+- `qca8k_port_set_pvid()` now snapshots egress and VLAN CTRL0 registers and attempts restoration if either write fails.
+- `qca8k_tag_8021q_vlan_add()` snapshots previous per-port VTU membership and VLAN egress mode, restores software PVID and attempts membership restoration on error (preserves prior existing VLAN entry).
+- This is **best-effort rollback**, NOT atomic hardware transaction. MDIO failure may also prevent recovery. HW fault injection, ARM compile and runtime remain untested. G2 and G3 must not be upgraded on source proof.

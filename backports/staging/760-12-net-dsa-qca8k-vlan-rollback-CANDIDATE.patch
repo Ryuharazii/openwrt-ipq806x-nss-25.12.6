@@ -1,0 +1,161 @@
+From: WG2600HP isolated source recovery experiment (2026-11-01)
+Subject: [CANDIDATE 760-12] qca8k: restore PVID registers and prior VLAN membership on failed add
+
+SOURCE ONLY. No hardware failure injection has been run.
+The VLAN-add transaction currently leaves membership and cached PVID changed
+when a later PVID write fails. Snapshot the previous per-port membership and
+both PVID registers, attempt best-effort rollback, and preserve original errno.
+Do not silently assume restoration when a hardware write fails.
+
+---
+--- a/drivers/net/dsa/qca/qca8k-common.c
++++ b/drivers/net/dsa/qca/qca8k-common.c
+@@ -1119,14 +1119,38 @@
+-int qca8k_port_set_pvid(struct qca8k_priv *priv, int port, u16 vid)
+-{
+-	int ret;
+-
+-	ret = qca8k_rmw(priv, QCA8K_EGRESS_VLAN(port),
+-			QCA8K_EGREES_VLAN_PORT_MASK(port),
+-			QCA8K_EGREES_VLAN_PORT(port, vid));
+-	if (ret)
+-		return ret;
+-
+-	return qca8k_write(priv, QCA8K_REG_PORT_VLAN_CTRL0(port),
+-			   QCA8K_PORT_VLAN_CVID(vid) |
+-			   QCA8K_PORT_VLAN_SVID(vid));
+-}
++int qca8k_port_set_pvid(struct qca8k_priv *priv, int port, u16 vid)
++{
++	u32 previous_egress, previous_ctrl0;
++	int ret, undo;
++
++	ret = qca8k_read(priv, QCA8K_EGRESS_VLAN(port), &previous_egress);
++	if (ret)
++		return ret;
++	ret = qca8k_read(priv, QCA8K_REG_PORT_VLAN_CTRL0(port),
++			 &previous_ctrl0);
++	if (ret)
++		return ret;
++
++	ret = qca8k_rmw(priv, QCA8K_EGRESS_VLAN(port),
++			QCA8K_EGREES_VLAN_PORT_MASK(port),
++			QCA8K_EGREES_VLAN_PORT(port, vid));
++	if (ret)
++		goto rollback;
++
++	ret = qca8k_write(priv, QCA8K_REG_PORT_VLAN_CTRL0(port),
++			  QCA8K_PORT_VLAN_CVID(vid) |
++			  QCA8K_PORT_VLAN_SVID(vid));
++	if (!ret)
++		return 0;
++
++rollback:
++	/* Best effort only: record rollback MDIO failures separately. */
++	undo = qca8k_write(priv, QCA8K_REG_PORT_VLAN_CTRL0(port),
++			   previous_ctrl0);
++	if (undo)
++		dev_err(priv->dev, "VLAN CTRL0 rollback failed on port %d: %d\n",
++			port, undo);
++	undo = qca8k_write(priv, QCA8K_EGRESS_VLAN(port), previous_egress);
++	if (undo)
++		dev_err(priv->dev, "egress VLAN rollback failed on port %d: %d\n",
++			port, undo);
++	return ret;
++}
+@@ -1368,23 +1368,72 @@
+-int qca8k_tag_8021q_vlan_add(struct dsa_switch *ds, int port, u16 vid,
+-			     u16 flags)
+-{
+-	bool untagged = flags & BRIDGE_VLAN_INFO_UNTAGGED;
+-	bool pvid = flags & BRIDGE_VLAN_INFO_PVID;
+-	struct qca8k_priv *priv = ds->priv;
+-	int ret;
+-
+-	ret = qca8k_vlan_add(priv, port, vid, untagged);
+-	if (ret) {
+-		dev_err(priv->dev, "Failed to add tag_8021q VLAN %d to port %d (%d)",
+-			vid, port, ret);
+-		return ret;
+-	}
+-
+-	if (pvid) {
+-		priv->tag_8021q_pvid[port] = vid;
+-		ret = qca8k_commit_pvid(ds, port,
+-					dsa_port_is_vlan_filtering(dsa_to_port(ds, port)));
+-	}
+-
+-	return ret;
+-}
++static int qca8k_tag_8021q_vlan_snapshot(struct qca8k_priv *priv, int port,
++					 u16 vid, bool *member, bool *untagged)
++{
++	u32 reg, mode;
++	int ret;
++
++	mutex_lock(&priv->reg_mutex);
++	ret = qca8k_vlan_access(priv, QCA8K_VLAN_READ, vid);
++	if (ret)
++		goto out;
++
++	ret = qca8k_read(priv, QCA8K_REG_VTU_FUNC0, &reg);
++	if (ret)
++		goto out;
++
++	mode = reg & QCA8K_VTU_FUNC0_EG_MODE_PORT_MASK(port);
++	*member = (reg & QCA8K_VTU_FUNC0_VALID) &&
++		  mode != QCA8K_VTU_FUNC0_EG_MODE_PORT_NOT(port);
++	*untagged = mode == QCA8K_VTU_FUNC0_EG_MODE_PORT_UNTAG(port);
++out:
++	mutex_unlock(&priv->reg_mutex);
++	return ret;
++}
++
++int qca8k_tag_8021q_vlan_add(struct dsa_switch *ds, int port, u16 vid,
++			     u16 flags)
++{
++	bool untagged = flags & BRIDGE_VLAN_INFO_UNTAGGED;
++	bool pvid = flags & BRIDGE_VLAN_INFO_PVID;
++	struct qca8k_priv *priv = ds->priv;
++	bool old_member, old_untagged;
++	u16 old_pvid;
++	int ret, undo;
++
++	ret = qca8k_tag_8021q_vlan_snapshot(priv, port, vid,
++					    &old_member, &old_untagged);
++	if (ret)
++		return ret;
++
++	old_pvid = priv->tag_8021q_pvid[port];
++	ret = qca8k_vlan_add(priv, port, vid, untagged);
++	if (ret) {
++		dev_err(priv->dev, "Failed to add tag_8021q VLAN %d to port %d (%d)",
++			vid, port, ret);
++		goto restore_member;
++	}
++
++	if (!pvid)
++		return 0;
++
++	priv->tag_8021q_pvid[port] = vid;
++	ret = qca8k_commit_pvid(ds, port,
++				dsa_port_is_vlan_filtering(dsa_to_port(ds, port)));
++	if (!ret)
++		return 0;
++
++	/* The PVID hardware helper already attempted register rollback. */
++	priv->tag_8021q_pvid[port] = old_pvid;
++
++restore_member:
++	/* Never delete a pre-existing member of this shared VLAN. */
++	if (old_member)
++		undo = qca8k_vlan_add(priv, port, vid, old_untagged);
++	else
++		undo = qca8k_vlan_del(priv, port, vid);
++
++	if (undo)
++		dev_err(priv->dev, "VLAN %u port %d membership rollback failed: %d\n",
++			vid, port, undo);
++
++	return ret;
++}
