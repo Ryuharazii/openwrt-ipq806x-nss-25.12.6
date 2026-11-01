@@ -1,0 +1,62 @@
+From: WG2600HP 25.12.6 integration candidate
+Subject: [PATCH] ecm: avoid invalid IPv4 next hops for bridge and DSA VLAN
+Pinned ECM: 9acdcb05c04ae177a79c4c34cef0487fbcedbfaa
+
+After physical conduit resolution, from/to NSS AE interface IDs have
+been validated as nonnegative. Linux bridge and logical DSA VLAN upper
+interfaces can still have -1 as their own AE ID. Never forward this
+invalid number as a valid IPv4 next hop when the corresponding physical
+NSS interface number is known. Preserve existing behavior for all
+other upper interface types and for already valid next hops.
+
+This is an uncompiled correction candidate, not a claim of firmware
+acceleration; G3 remains FAIL, with no full build or hardware flash.
+
+--- a/frontends/nss/ecm_nss_ported_ipv4.c
++++ b/frontends/nss/ecm_nss_ported_ipv4.c
+@@ -454,8 +454,21 @@
+ 	from_nss_iface = from_ifaces[ECM_DB_IFACE_HEIRARCHY_MAX - 1];
+ 	to_nss_iface = to_ifaces[ECM_DB_IFACE_HEIRARCHY_MAX - 1];
+ 	nircm->nexthop_rule.flow_nexthop = ecm_db_iface_ae_interface_identifier_get(from_nss_iface);
+ 	nircm->nexthop_rule.return_nexthop = ecm_db_iface_ae_interface_identifier_get(to_nss_iface);
++
++	/* The Linux bridge/DSA VLAN may not have a registered NSS ID.
++	 * Use the already validated physical interface for the next hop
++	 * only when this upper interface has no NSS mapping of its own.
++	 */
++	if (nircm->nexthop_rule.flow_nexthop < 0 &&
++	    (ecm_db_iface_type_get(from_nss_iface) == ECM_DB_IFACE_TYPE_VLAN ||
++	     ecm_db_iface_type_get(from_nss_iface) == ECM_DB_IFACE_TYPE_BRIDGE))
++		nircm->nexthop_rule.flow_nexthop = from_nss_iface_id;
++	if (nircm->nexthop_rule.return_nexthop < 0 &&
++	    (ecm_db_iface_type_get(to_nss_iface) == ECM_DB_IFACE_TYPE_VLAN ||
++	     ecm_db_iface_type_get(to_nss_iface) == ECM_DB_IFACE_TYPE_BRIDGE))
++		nircm->nexthop_rule.return_nexthop = to_nss_iface_id;
+ 
+ 	/*
+ 	 * New rule being created
+ 	 */
+--- a/frontends/nss/ecm_nss_non_ported_ipv4.c
++++ b/frontends/nss/ecm_nss_non_ported_ipv4.c
+@@ -528,8 +528,21 @@
+ 	from_nss_iface = from_ifaces[ECM_DB_IFACE_HEIRARCHY_MAX - 1];
+ 	to_nss_iface = to_ifaces[ECM_DB_IFACE_HEIRARCHY_MAX - 1];
+ 	nircm->nexthop_rule.flow_nexthop = ecm_db_iface_ae_interface_identifier_get(from_nss_iface);
+ 	nircm->nexthop_rule.return_nexthop = ecm_db_iface_ae_interface_identifier_get(to_nss_iface);
++
++	/* The Linux bridge/DSA VLAN may not have a registered NSS ID.
++	 * Use the already validated physical interface for the next hop
++	 * only when this upper interface has no NSS mapping of its own.
++	 */
++	if (nircm->nexthop_rule.flow_nexthop < 0 &&
++	    (ecm_db_iface_type_get(from_nss_iface) == ECM_DB_IFACE_TYPE_VLAN ||
++	     ecm_db_iface_type_get(from_nss_iface) == ECM_DB_IFACE_TYPE_BRIDGE))
++		nircm->nexthop_rule.flow_nexthop = from_nss_iface_id;
++	if (nircm->nexthop_rule.return_nexthop < 0 &&
++	    (ecm_db_iface_type_get(to_nss_iface) == ECM_DB_IFACE_TYPE_VLAN ||
++	     ecm_db_iface_type_get(to_nss_iface) == ECM_DB_IFACE_TYPE_BRIDGE))
++		nircm->nexthop_rule.return_nexthop = to_nss_iface_id;
+ 
+ 	/*
+ 	 * New rule being created
+ 	 */
