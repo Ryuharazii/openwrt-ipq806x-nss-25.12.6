@@ -1,0 +1,153 @@
+From: WG2600HP DSA isolated backport 2026-11-02
+Subject: [CANDIDATE 760-10] Unwind tag_8021q partial add and bridge VLAN replacement
+
+Base: Linux v6.12.112 after 760-03, 760-06, 760-08.
+Unwind successfully configured switch ports if a later per-port VLAN add
+fails; report rollback failures without masking the original error.
+When replacing standalone with bridge VLAN, a failed standalone removal
+must not announce TX forwarding offload; attempt bridge VLAN removal.
+The failing port's partial hardware writes and cross-switch atomicity
+remain unresolved. No user VLAN configuration required.
+STAGING ONLY: not integrated, compiled, or tested on WG2600HP.
+
+---
+--- a/net/dsa/tag_8021q.c
++++ b/net/dsa/tag_8021q.c
+@@ -224,31 +224,49 @@
+-int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
+-				  struct dsa_notifier_tag_8021q_vlan_info *info)
+-{
+-	struct dsa_port *dp;
+-	int err;
+-
+-	/* Since we use dsa_broadcast(), there might be other switches in other
+-	 * trees which don't support tag_8021q, so don't return an error.
+-	 * Or they might even support tag_8021q but have not registered yet to
+-	 * use it (maybe they use another tagger currently).
+-	 */
+-	if (!ds->ops->tag_8021q_vlan_add || !ds->tag_8021q_ctx)
+-		return 0;
+-
+-	dsa_switch_for_each_port(dp, ds) {
+-		if (dsa_port_tag_8021q_vlan_match(dp, info)) {
+-			u16 flags = 0;
+-
+-			if (dsa_port_is_user(dp))
+-				flags |= BRIDGE_VLAN_INFO_UNTAGGED |
+-					 BRIDGE_VLAN_INFO_PVID;
+-
+-			err = dsa_port_do_tag_8021q_vlan_add(dp, info->vid,
+-							     flags);
+-			if (err)
+-				return err;
+-		}
+-	}
+-
+-	return 0;
+-}
++int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
++				  struct dsa_notifier_tag_8021q_vlan_info *info)
++{
++	struct dsa_port *dp, *rollback_dp;
++	int err, rollback_err;
++
++	/* Since we use dsa_broadcast(), there might be other switches in other
++	 * trees which don't support tag_8021q, so don't return an error.
++	 * Or they might even support tag_8021q but have not registered yet to
++	 * use it (maybe they use another tagger currently).
++	 */
++	if (!ds->ops->tag_8021q_vlan_add || !ds->tag_8021q_ctx)
++		return 0;
++
++	dsa_switch_for_each_port(dp, ds) {
++		if (dsa_port_tag_8021q_vlan_match(dp, info)) {
++			u16 flags = 0;
++
++			if (dsa_port_is_user(dp))
++				flags |= BRIDGE_VLAN_INFO_UNTAGGED |
++					 BRIDGE_VLAN_INFO_PVID;
++
++			err = dsa_port_do_tag_8021q_vlan_add(dp, info->vid,
++							     flags);
++			if (err)
++				goto rollback;
++		}
++	}
++
++	return 0;
++
++rollback:
++	/* Undo the successful prefix on this switch without touching the
++	 * failing port. The driver must unwind its own partial write.
++	 */
++	dsa_switch_for_each_port(rollback_dp, ds) {
++		if (rollback_dp == dp)
++			break;
++		if (!dsa_port_tag_8021q_vlan_match(rollback_dp, info))
++			continue;
++
++		rollback_err = dsa_port_do_tag_8021q_vlan_del(rollback_dp,
++							      info->vid);
++		if (rollback_err)
++			dev_err(ds->dev, "8021Q VLAN %u port %d rollback failed: %d\n",
++				info->vid, rollback_dp->index, rollback_err);
++	}
++	return err;
++}
+@@ -295,24 +295,32 @@
+-int dsa_tag_8021q_bridge_join(struct dsa_switch *ds, int port,
+-			      struct dsa_bridge bridge, bool *tx_fwd_offload,
+-			      struct netlink_ext_ack *extack)
+-{
+-	struct dsa_port *dp = dsa_to_port(ds, port);
+-	u16 standalone_vid, bridge_vid;
+-	int err;
+-
+-	/* Delete the standalone VLAN of the port and replace it with a
+-	 * bridging VLAN
+-	 */
+-	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
+-	bridge_vid = dsa_tag_8021q_bridge_vid(bridge.num);
+-
+-	err = dsa_port_tag_8021q_vlan_add(dp, bridge_vid, true);
+-	if (err)
+-		return err;
+-
+-	dsa_port_tag_8021q_vlan_del(dp, standalone_vid, false);
+-
+-	*tx_fwd_offload = true;
+-
+-	return 0;
+-}
++int dsa_tag_8021q_bridge_join(struct dsa_switch *ds, int port,
++			      struct dsa_bridge bridge, bool *tx_fwd_offload,
++			      struct netlink_ext_ack *extack)
++{
++	struct dsa_port *dp = dsa_to_port(ds, port);
++	u16 standalone_vid, bridge_vid;
++	int err, rollback_err;
++
++	/* Delete the standalone VLAN of the port and replace it with a
++	 * bridging VLAN
++	 */
++	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
++	bridge_vid = dsa_tag_8021q_bridge_vid(bridge.num);
++
++	err = dsa_port_tag_8021q_vlan_add(dp, bridge_vid, true);
++	if (err)
++		return err;
++
++	err = dsa_port_tag_8021q_vlan_del(dp, standalone_vid, false);
++	if (err) {
++		rollback_err = dsa_port_tag_8021q_vlan_del(dp, bridge_vid, true);
++		if (rollback_err)
++			dev_err(ds->dev,
++				"8021Q bridge VLAN %u rollback failed on port %d: %d\n",
++				bridge_vid, port, rollback_err);
++		return err;
++	}
++
++	*tx_fwd_offload = true;
++
++	return 0;
++}
