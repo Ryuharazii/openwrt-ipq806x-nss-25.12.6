@@ -5,10 +5,10 @@ ISOLATED, NOT FOR BUILD/DEPLOYMENT. Requires 760-01, 760-10, 760-02
 and full DSA VLAN, ECM, NSS and dual-CPU validation.
 
 760-10 still used a deleted standalone VID for unmarked VLAN-aware
-bridge traffic. On a VLAN-aware bridge, preserve actual 802.1Q tags.
+bridge traffic. On a VLAN-aware bridge, preserve only valid 802.1Q tags; reject reserved DSA VIDs.
 For untagged local/routed traffic, request the egress DSA port's PVID
 under RCU and tag that VID, rejecting missing/invalid PVID.
-Reject marked-but-untagged frames of unknown VLAN, and non-802.1Q
+Reject wrongly typed HW tags, embedded reserved VIDs, marked-but-untagged frames of unknown VLAN, and non-802.1Q
 bridge protocols (including 802.1ad) rather than risking leakage.
 
 This is an unverified isolation candidate, not an assurance of correct
@@ -17,7 +17,7 @@ No user VLAN interfaces or board network settings are added.
 
 --- a/net/dsa/tag_qca_8021q.c
 +++ b/net/dsa/tag_qca_8021q.c
-@@ -67,12 +67,41 @@
+@@ -67,12 +67,49 @@
  
  	struct net_device *br = dsa_port_bridge_dev_get(dp);
  
@@ -42,12 +42,20 @@ No user VLAN interfaces or board network settings are added.
 +			return NULL;
 +
 +		if (skb_vlan_tag_present(skb)) {
-+			if (vid_is_dsa_8021q(skb_vlan_tag_get_id(skb)))
++			if (skb->vlan_proto != htons(ETH_P_8021Q) ||
++			    vid_is_dsa_8021q(skb_vlan_tag_get_id(skb)))
 +				return NULL;
 +			return skb;
 +		}
-+		if (skb->protocol == htons(ETH_P_8021Q))
++		if (skb->protocol == htons(ETH_P_8021Q)) {
++			u16 tci;
++			if (__vlan_get_tag(skb, &tci) ||
++			    vid_is_dsa_8021q(tci & VLAN_VID_MASK))
++				return NULL;
 +			return skb;
++		}
++		if (skb->protocol == htons(ETH_P_8021AD))
++			return NULL;
 +
 +		if (skb->offload_fwd_mark)
 +			return NULL;
