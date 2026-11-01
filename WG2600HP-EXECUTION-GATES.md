@@ -497,3 +497,9 @@
 - 根拠：全ソースCI [#41274742598](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274742598)により、`include/net/dsa.h`の現物に既存`DSA_TAG_PROTO_BRCM_LEGACY_FCS_VALUE=29`を確認。導入パッチは`target/linux/generic/backport-6.12/611-01-v6.17-net-dsa-tag_brcm-add-support-for-legacy-FCS-tags.patch`。この既存backport後に現行候補`760-01`の`QCA_8021Q_VALUE=29`が重複し、最初のハンクはGNUとgit apply両方FAIL。**単なる空白/位置問題ではなく、プロトコル識別子の実質的衝突**。
 - 隔離`760-01`の追加タグ識別値を**30**へ変更。定義の追加位置は既存28番の直後の3行文脈で固定し、素のLinux6.12とOpenWrtの611-01適用後の両方に一致可能にする。その他DSAタグコード/DSAユーザーポート/WAN/LAN設定は変更しない。host-only二重ゲートに追加の番号一意性検査を加え、全kernelでは29=BRCM_LEGACY_FCS、30=QCA_8021Qを必須とする。コンパイルや実ネットワークの検証と混同しない。
 - この変更の実際のOpenWrt全パッチ連続適用および選択12本結果は**CI前は未確認**。G1/G2未完、G3 FAIL、ファームビルド/書込み禁止。
+
+## 2026-11-01 第24セッション：DSA厳格試験をOpenWrtの実先行依存へ訂正
+
+- 修正コミット`3ba024935e8f710fb17cfb3000010b8299d46864`の隔離CI [#41274860133](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41274860133)では、`760-01`の29→30変更後、以前の素のLinuxだけを基準にした選択試験の第一ハンクがstrict-fuzz0 FAILして後段は未実行。**この検証の起点は公式OpenWrtが既に`611-01`を適用した状態とは異なる**。
+- 厳格な選択ゲートを、Linux v6.12.112タグ本体7ファイルに`net/dsa/tag_brcm.c`の固定blob（`df0ab8215b8101fa781557c97af18aa12e8dcf66`）を追加した8ファイルへ拡張。`611-01`→711/712→760系8本の合計13本を実適用し、29=BRCM_FCS、30=QCA_8021Q の一意性を必須とした。修正した760-01の第一ハンクは、611-01が追加した識別子29の直後に30を置く標準diff文脈とし、パッチ本体のタグ機能は変更しない。これが本当にstrict-fuzz0で通るかは新CIログ確認前まで**未判定**。
+- 全kernel archive＋全patch試験も同じ候補を使用。通常ブランチ、LAN/WAN/VLAN設定は不変更。G1/G2未完、**G3 FAIL**、ビルド・フラッシュなし。

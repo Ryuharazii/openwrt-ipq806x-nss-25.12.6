@@ -14,11 +14,14 @@ Reference: Stanislaw Pal's 6.18 implementation (2026-09-11).
 ---
 --- a/include/net/dsa.h
 +++ b/include/net/dsa.h
-@@ -54,3 +54,4 @@
- #define DSA_TAG_PROTO_RZN1_A5PSW_VALUE		26
+@@ -55,6 +55,7 @@
  #define DSA_TAG_PROTO_LAN937X_VALUE		27
  #define DSA_TAG_PROTO_VSC73XX_8021Q_VALUE	28
+ #define DSA_TAG_PROTO_BRCM_LEGACY_FCS_VALUE	29
 +#define DSA_TAG_PROTO_QCA_8021Q_VALUE		30
+ 
+ enum dsa_tag_protocol {
+ 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
 @@ -85,6 +86,7 @@
  	DSA_TAG_PROTO_RZN1_A5PSW	= DSA_TAG_PROTO_RZN1_A5PSW_VALUE,
  	DSA_TAG_PROTO_LAN937X		= DSA_TAG_PROTO_LAN937X_VALUE,

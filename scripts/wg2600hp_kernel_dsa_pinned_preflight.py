@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host-only exact Linux v6.12.112 QCA8K/DSA isolated patch-chain gate.
 
-Checks the selected upstream files, stock OpenWrt 711/712 patches, then
+Checks upstream files, 611-01 backport and stock 711/712 patches, then
 staged 760-01/02/03/06/08/09/10/11. Not an OpenWrt full-patch-tree check,
 a kernel compile, boot test, or NSS hardware proof.
 """
@@ -20,11 +20,13 @@ UPSTREAM_BLOBS = {
     "net/dsa/Kconfig": "2dfe9063613feb3251f3ec9f96adc87d2e0cd47a",
     "net/dsa/Makefile": "555c07cfeb71285b1904bb5ffa0ec8702c1267f8",
     "net/dsa/tag_8021q.c": "53e03fd8071b4a27117d4cb0c1bdc0a103eeed92",
+    "net/dsa/tag_brcm.c": "df0ab8215b8101fa781557c97af18aa12e8dcf66",
     "drivers/net/dsa/qca/qca8k.h": "2e4092f816f9752c5befc020812eb6eaf3825ead",
     "drivers/net/dsa/qca/qca8k-8xxx.c": "a0bb836805c6e98786771e0d303fb5c51a1385fa",
     "drivers/net/dsa/qca/qca8k-common.c": "560c74c4ac3dd44ec1f0a0967a39d61e12f2f66b",
 }
 PATCHES = (
+    "target/linux/generic/backport-6.12/611-01-v6.17-net-dsa-tag_brcm-add-support-for-legacy-FCS-tags.patch",
     "target/linux/generic/pending-6.12/711-01-net-dsa-qca8k-implement-lag_fdb_add-del-ops.patch",
     "target/linux/generic/pending-6.12/711-02-net-dsa-qca8k-enable-flooding-to-both-CPU-port.patch",
     "target/linux/generic/pending-6.12/711-03-net-dsa-qca8k-add-support-for-port_change_master.patch",
@@ -151,11 +153,11 @@ def run():
         numeric = {}
         for name, number in defs:
             numeric.setdefault(int(number), []).append(name)
-        if any(len(names) != 1 for names in numeric.values()) or numeric.get(30) != ["QCA_8021Q"]:
+        if any(len(names) != 1 for names in numeric.values()) or numeric.get(29) != ["BRCM_LEGACY_FCS"] or numeric.get(30) != ["QCA_8021Q"]:
             print(f"DSA_SELECTED_PROTOCOL_IDS=FAIL {numeric}", flush=True)
             return 26
-        print("DSA_SELECTED_PROTOCOL_IDS=PASS QCA_8021Q=30 (no 611-01 on upstream subset)", flush=True)
-        print("DSA_PATCH_CHAIN=PASS 7 verified upstream source files, 12 patch steps", flush=True)
+        print("DSA_SELECTED_PROTOCOL_IDS=PASS ID29=BRCM_LEGACY_FCS ID30=QCA_8021Q", flush=True)
+        print("DSA_PATCH_CHAIN=PASS 8 verified upstream source files, 13 patch steps", flush=True)
         print("DSA_SCOPE=SELECTED_SUBSET_ONLY NO_OPENWRT_FULL_PATCHSET NO_COMPILE NO_BOOT NO_NSS_ACK", flush=True)
         return 0
 
