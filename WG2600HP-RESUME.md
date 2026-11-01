@@ -96,3 +96,12 @@
 - **外部事例は別機種**: IPQ5018/QCA8337向けの公開実装 `kuncy7/openwrt-nss-edma/README.ipq50xx.md` は、NSSによるQCA 2バイトヘッダの解釈困難を指摘。ただしWG2600HP/IPQ8064での実証ではない。現機種向けのデータパスをクロス確認する必要がある。
 - **ECM候補の適用順の事実確認**: 実packageパッチ名は `400-kernel-6.12-support.patch` と `401-kernel-6.12-drop-sysctl-sentinels.patch`。隔離 `760-04/05` は未統合・未コンパイル、正しいNSS IF・WAN/LAN分離未実証。標準ECM variantのMakefileには `ECM_INTERFACE_VLAN_ENABLE=y` があるが、それをユーザー設定へのVLAN追加根拠にしてはならない。
 - **次の順序**: 既存のQCA8337二CPUポート＋GMAC eth0/eth1＋タグ無し運用可否を、旧実機通信経路、NSS FWのヘッダ受理、ECM IF解決、LAN/WAN分離と照合。切替に伴うDSA解除/復旧、PHY、起動順も確認。根拠が不足する間 G1/G2未確認・G3 FAIL、仮想フルブート未実施、ARMビルド・実機書込みなし。
+
+## 2026-11-01 追加横断確認：既存DSA conduit構成を変更せずECM/NSS障害に集中
+
+- **既存設定が存在することをGitHubで再確認**：`target/linux/ipq806x/base-files/etc/board.d/02_network` の `nec,wg2600hp)` は `wan→eth0`、`lan1/lan2/lan3/lan4→eth1` を `ucidef_set_network_device_conduit` で指定。対象DTSはQCA8337 CPU port0→GMAC1、CPU port6→GMAC2。これは**設定ソースにあることの証明**であって起動後の実際の所属確認ではない。**追加VLAN設定もネットワーク設定変更も不要とする条件を維持**。
+- **起動段階の区別**：Linux v6.12.112 `net/dsa/dsa.c` の `dsa_tree_setup_cpu_ports()` は初期状態で最初のローカルCPU portを各user portに設定する。一方、既存OpenWrt 711-03は`.port_change_conduit = qca8k_port_change_master`を実装し、上記board.dの設定により起動後の再割当てを意図している。`ip -d link show dev lan1` / `... wan` の実機出力で反映確認するまでは**実機PASSとしない**。
+- **既存対策の重複防止**：OpenWrt 711-02は両CPUポートへの未知フレームfloodingを有効にする既存パッチ。711-03は再割当て時のswitch接続更新を持つ。2026年8月の[RFC v2 4/6](https://lkml.iu.edu/2608.0/00861.html)は起動時の各user port→割当CPU portに応じたハードウェア初期化を提案しているが、**WG2600HPへの直接適用可否、既存711-02/03との重複と実機効果は未検証**。いきなり新たな修正を積まない。
+- **ECM stagingの明確な制限**：`backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch`は`!dp->ds->tag_8021q_ctx`ならconduit取得をNULLで終了するため、**現行QCAタガーのままではこの候補を適用してもDSA user→NSS IF解決問題を修正できない**。本統合しない。既存RAM実測の`AE IF=-1`、`FAIL_RULE=-2`、NSS CREATE=0を優先する。
+- **新規外部情報との境界**：IPQ5018/QCA8337の公開事例ではQCAの2BヘッダをNSSが解析できない報告あり。ただしSoC・DPが異なり**WG2600HP/IPQ8064の実証ではない**。QCAヘッダとNSS FW処理の互換性、LAN/WAN独立性、MTU、NSSルール生成を機種固有の根拠で横断確認する必要がある。
+- **このセッションの確認の種類**：GitHub実ファイル5件とLinux v6.12.112のDSAソース・公的文書の照合、出現条件7件の静的チェックのみ。**修正/ARMビルド/QEMUで電源投入から起動完了/実機RAM起動/通信・オフロード実測は未実施**。G1/G2未確認、G3 FAILを維持。次はECM pinnedの階層構築とNSS GMAC IFへ対応づける経路を、QCAタグ互換性と一体で照合する。
