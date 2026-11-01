@@ -90,7 +90,7 @@ if [ "$#" -eq 2 ] && [ "$1" = "--arm-kernel" ]; then
   git -C "$drv" init -q
   git -C "$drv" remote add origin https://git.codelinaro.org/clo/qsdk/oss/lklm/nss-drv.git
   echo "ECM_NSS_INCLUDE_FETCH=START pin=3cfb9f43"
-  if ! timeout 90s git -C "$drv" -c http.lowSpeedLimit=100 -c http.lowSpeedTime=20 fetch --no-tags --depth=1 origin 3cfb9f43; then
+  if ! timeout 90s git -C "$drv" -c http.lowSpeedLimit=100 -c http.lowSpeedTime=20 fetch --no-tags --depth=1 origin 3cfb9f43536e77ae05a141cce18a242b85e834ab; then
     echo "ECM_NSS_INCLUDE_FETCH=BLOCKED"
     exit 32
   fi
