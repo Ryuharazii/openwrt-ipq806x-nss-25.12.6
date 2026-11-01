@@ -18,6 +18,7 @@ FILES = (
     "target/linux/ipq806x/patches-6.12/990-0001-Add-required-entries-in-dts-files-for-NSS-support.patch",
     "package/qca-nss/qca-nss-gmac/patches/02-kernel-5.15-support.patch",
     "package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch",
+    "package/qca-nss/qca-nss-gmac/patches/10-wg2600hp-nss-gmac-dsa-mtu-6.12.patch",
     "target/linux/ipq806x/image/generic.mk",
     "diff-wg2600hp-nss",
     "package/kernel/mac80211/Makefile",
