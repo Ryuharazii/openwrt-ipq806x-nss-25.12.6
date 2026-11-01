@@ -1,0 +1,35 @@
+name: WG2600HP isolated DSA staging host checks
+
+on:
+  push:
+    branches:
+      - wg2600hp-nss-audit-gate-isolated-20261101
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-host-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact staged patch chain matches tested host function
+        run: python3 tests/test_wg2600hp_staged_tagger_sync.py
+      - name: Compile 12-case host guard model (no firmware build)
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic tests/wg2600hp_qca8021q_guard_host.c -o /tmp/wg2600hp_qca_guard
+      - name: Run 12 positive guard cases
+        run: /tmp/wg2600hp_qca_guard
+      - name: Verify old 760-10 model still detects its known flaw
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pedantic tests/wg2600hp_qca8021q_tx_host.c -o /tmp/wg2600hp_qca_old
+          set +e
+          /tmp/wg2600hp_qca_old > /tmp/old-test-results.txt
+          status=$?
+          set -e
+          cat /tmp/old-test-results.txt
+          test "$status" -eq 1
+          grep -F "FAIL VLAN-aware routed" /tmp/old-test-results.txt
+      - name: Explicit scope boundary
+        run: echo "HOST-ONLY PASS does not establish ARM kernel build, boot, IPv4 or NSS offload."
