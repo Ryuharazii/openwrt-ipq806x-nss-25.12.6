@@ -81,6 +81,19 @@ def run():
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
         print(f"DSA_76001_GNU_VERBOSE={'PASS' if verbose.returncode == 0 else 'FAIL'}", flush=True)
         print(verbose.stdout[-3000:], flush=True)
+        for label, options in (
+            ("IGNORE_SPACE", ["--ignore-whitespace"]),
+            ("DEFAULT_FUZZ", []),
+            ("POSIX", ["--posix"]),
+        ):
+            extra = subprocess.run(
+                ["patch", "--directory", str(scratch), "-p1", "--batch",
+                 "--forward", "--dry-run", "--input", str(stage_one)] + options,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                check=False)
+            print(f"DSA_76001_GNU_{label}={'PASS' if extra.returncode == 0 else 'FAIL'}", flush=True)
+            if extra.returncode:
+                print(extra.stdout[-350:], flush=True)
         print(f"DSA_76001_STOCK_DRY_RUN={'PASS' if dry.returncode == 0 else 'FAIL'}", flush=True)
         if dry.returncode:
             print(dry.stdout[-2500:], flush=True)
