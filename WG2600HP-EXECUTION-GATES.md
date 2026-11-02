@@ -347,3 +347,9 @@
 - **統合選択の候補**：`backports/staging/760-11-wg2600hp-nss-vlan-build-selection-CANDIDATE.patch` に二つの`.config` 選択を記載（`2753956771a7f55465688ab1e26586ae5455d17c`）。現在の`diff-wg2600hp-nss`には未適用。候補unified diffのold文脈10行は現行ファイルと完全一致、old/newの行数10/12一致。
 - **修正後の確認**：隔離GitHub保存内容を再取得。Kconfig、NSS drvのデフォルト無効分岐、clients IPQ806x宣言、ドライバ依存・ビルド引数・eval、候補選択2項目、現行ビルド設定非変更の合計11項目を静的確認し11/11一致。ビルド／ランタイムPASSには相当しない。
 - **未解決のゲート**：現行NSSドライバ`3cfb9f43`＋clients`ef082a735fad96bd2f6f59b94d6ea81defc4796e`のVLAN manager実ビルドとFW対応、ECM`9acdcb05`でのVLAN AE interface番号解決、DSA internal VIDのNSSルール投入、QCA8337の二CPU分離と有線IPv4、Wi-Fi NSSと固定IPIP6。既存実機の `AE IF=-1` / `CREATE=0` はまだ修正後実測なし。G1/G2未完了、G3 FAIL、新規ARMビルド・RAM起動・ファーム生成なし。通常ブランチと実機設定は無変更。
+
+## 2026-11-02 DSA統合ブランチ／ビルド前ゲート
+
+- 統合ブランチ `wg2600hp-dsa-integration-20261102` に `ad3e57df63ed92d4410346401723c4369fd43a34` でLinux側760-02/03/06/08/09/10、ECM側390-04/05、DTS・DSAカーネル設定・WG2600HP専用NSS VLAN選択をビルド入力へ反映。通常ブランチ・swconfig版には変更なし。
+- generic `711-01/02/03`→`712`→`760-01`、ipq806x `760-02/03/06/08/09/10` の順に、Linux v6.12.112原ソースに対する計50ハンクの文脈一致・メモリ上の変換が完走。途中で`712`を除外して発生した擬似失敗は補正済。一箇所は複数文脈一致を原行位置の近傍で判別したため、実際のパッチユーティリティによる適用確認は残る。証拠は `WG2600HP-DSA-INTEGRATION-20261102.md`。
+- **G1/G2未完、G3 FAIL**：固定pin ECMに390-04/05と既存400/401が適用できること、ARMビルド、NSS VLAN manager・FW互換性、ECMのAE IF番号解決、DSA二CPUの分離・IPv4双方向通信を未確認。従ってG3の条件に従いビルドとファーム書込みは未実施。カーネル側ソース文脈一致は実装の一部検査でありビルドPASSではない。
