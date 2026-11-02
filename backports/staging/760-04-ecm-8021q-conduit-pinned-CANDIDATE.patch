@@ -30,7 +30,7 @@ NOT YET COMPILE VERIFIED.
  #ifdef ECM_INTERFACE_PPP_ENABLE
  #include <linux/if_pppox.h>
  #ifdef ECM_INTERFACE_L2TPV2_ENABLE
-@@ -304,14 +308,59 @@
+@@ -304,14 +308,64 @@
  }
  EXPORT_SYMBOL(ecm_interface_get_and_hold_dev_master);
  
@@ -85,11 +85,16 @@ NOT YET COMPILE VERIFIED.
 +static inline struct net_device *ecm_interface_vlan_real_dev(struct net_device *vlan_dev)
 +{
 +#ifdef ECM_INTERFACE_VLAN_ENABLE
-+	if (is_vlan_dev(vlan_dev)) {
-+		struct net_device *real = vlan_dev_next_dev(vlan_dev);
-+		struct net_device *conduit = ecm_interface_dsa_8021q_conduit(real, NULL);
-+		return conduit ? conduit : real;
-+	}
++	/* Keep each explicit VLAN layer in the ECM hierarchy. Mapping a
++	 * VLAN upper directly to the DSA conduit would silently discard
++	 * the DSA port's internal tag_8021q VID on the next iteration.
++	 */
++	if (is_vlan_dev(vlan_dev))
++		return vlan_dev_next_dev(vlan_dev);
++
++	/* Only a DSA user netdev using the 8021Q tagger resolves to
++	 * a physical NSS-registered conduit (eth0/eth1).
++	 */
 +	return ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);
 +#else
 +	return vlan_dev_next_dev(vlan_dev);
