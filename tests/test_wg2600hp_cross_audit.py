@@ -10,7 +10,7 @@ import unittest
 REPO = Path(__file__).resolve().parent.parent
 FILES = (
     "scripts/wg2600hp_cross_audit.py",
-    "backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch",
+    "package/qca-nss/qca-nss-ecm/patches/402-dsa-tag_8021q-user-ports-as-vlans.patch",
     "scripts/wg2600hp_verify_embedded_dtb.py",
     "scripts/wg2600hp_verify_wifi_nss_binary.py",
     "scripts/wg2600hp_nss_image_gate.sh",
@@ -18,7 +18,7 @@ FILES = (
     "target/linux/ipq806x/base-files/etc/board.d/02_network",
     "target/linux/ipq806x/patches-6.12/990-0001-Add-required-entries-in-dts-files-for-NSS-support.patch",
     "package/qca-nss/qca-nss-gmac/patches/02-kernel-5.15-support.patch",
-    "package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch",
+    "package/qca-nss/qca-nss-gmac/patches/10-set-netdev-parent.patch",
     "target/linux/ipq806x/image/generic.mk",
     "diff-wg2600hp-nss",
     "package/kernel/mac80211/Makefile",
@@ -56,14 +56,14 @@ class CrossAuditTest(unittest.TestCase):
 
     def test_detects_ecm_dsa_vlan_hierarchy_flattening(self):
         self.mutate(
-            "backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch",
-            "+\t\treturn vlan_dev_next_dev(vlan_dev);",
-            "+\t\treturn ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);",
+            "package/qca-nss/qca-nss-ecm/patches/402-dsa-tag_8021q-user-ports-as-vlans.patch",
+            "+\t\treturn dsa_port_to_conduit(dp);",
+            "+\t\treturn NULL;",
         )
         result = self.run_audit()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "FAIL Staged ECM preserves VLAN over DSA hierarchy before NSS conduit",
+            "FAIL Applied ECM maps DSA 8021Q VLAN to physical NSS conduit",
             result.stdout,
         )
 

@@ -1,7 +1,10 @@
 name: Build WG2600HP NSS 25.12.6
 
-# Manual builds only: avoid unnecessary 6-hour GitHub runner jobs on each commit.
+# Integration-branch-only build; production branches remain manual.
 on:
+  push:
+    branches:
+      - 'wg2600hp-dsa-integration-20261102'
   workflow_dispatch:
 
 concurrency:

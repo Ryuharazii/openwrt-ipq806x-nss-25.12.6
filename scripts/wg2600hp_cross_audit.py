@@ -49,7 +49,7 @@ def main():
     net = read("target/linux/ipq806x/base-files/etc/board.d/02_network")
     gmac_patch = read("target/linux/ipq806x/patches-6.12/990-0001-Add-required-entries-in-dts-files-for-NSS-support.patch")
     gmac_api = read("package/qca-nss/qca-nss-gmac/patches/02-kernel-5.15-support.patch")
-    dsa_conduit = read("package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch")
+    dsa_conduit = read("package/qca-nss/qca-nss-gmac/patches/10-set-netdev-parent.patch")
     config = read("diff-wg2600hp-nss")
     image_gate = read("scripts/wg2600hp_nss_image_gate.sh")
     image_verifier = read("scripts/wg2600hp_verify_embedded_dtb.py")
@@ -58,7 +58,7 @@ def main():
     runtime = read("target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit")
     mac80211 = read("package/kernel/mac80211/Makefile")
     wifi_redirect = read("package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch")
-    ecm_dsa_patch = read("backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch")
+    ecm_dsa_patch = read("package/qca-nss/qca-nss-ecm/patches/402-dsa-tag_8021q-user-ports-as-vlans.patch")
 
     # 1. Catch the Linux return-value contract regression before boot.
     patches = ROOT.glob("target/linux/ipq806x/patches-6.12/*.patch")
@@ -70,8 +70,8 @@ def main():
     check("Linux of_get_phy_mode return-value regression absent", not bad_api_patches)
     check("NSS GMAC uses the two-argument PHY-mode API",
           "+\tof_get_phy_mode(np, &gmaccfg->phy_mii_type);" in gmac_api)
-    check("NSS GMAC exposes OF node for DSA conduit matching",
-          "+\tnetdev->dev.of_node = pdev->dev.of_node;" in dsa_conduit)
+    check("NSS GMAC netdev parent is DSA-compatible platform device",
+          "+\tSET_NETDEV_DEV(netdev, &pdev->dev);" in dsa_conduit)
 
     # 2. Follow the entire CPU link: DSA port -> GMAC -> fixed link.
     mdio = node(dts, r"&mdio0")
@@ -133,18 +133,13 @@ def main():
         check("Network %s -> %s conduit" % (name, conduit),
               'ucidef_set_network_device_conduit "%s" "%s"' % (name, conduit) in block)
 
-    # Preserve both the explicit VLAN VID and the internal DSA 8021Q VID.
-    # Flattening VLAN upper -> NSS conduit would erase the DSA VLAN layer.
-    walk_start = ecm_dsa_patch.find(
-        "+static inline struct net_device *ecm_interface_vlan_real_dev(")
-    walk_end = ecm_dsa_patch.find(
-        "\n /*\n  * ecm_interface_dev_find_by_local_addr_ipv4()", walk_start)
-    walk = ecm_dsa_patch[walk_start:walk_end] if walk_start >= 0 and walk_end > walk_start else ""
-    check("Staged ECM preserves VLAN over DSA hierarchy before NSS conduit",
-          "+\tif (is_vlan_dev(vlan_dev))\n+\t\treturn vlan_dev_next_dev(vlan_dev);" in walk
-          and "+\treturn ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);" in walk
-          and "return conduit ? conduit : real" not in walk)
-    # 6. Keep NSS Wi-Fi redirect enabled, and rebuild mac80211 on a toggle.
+    # The field-tested ECM patch maps DSA port VLANs to their NSS conduit.
+    check("Applied ECM maps DSA 8021Q VLAN to physical NSS conduit",
+          "+\tstruct net_device *conduit = ecm_interface_dsa_8021q_conduit(vlan_dev);" in ecm_dsa_patch
+          and "+\treturn is_vlan_dev(dev) || ecm_interface_dsa_8021q_vid(dev) > 0;" in ecm_dsa_patch
+          and "+\tif (dp && !dsa_port_bridge_dev_get(dp))" in ecm_dsa_patch
+          and "+\t\treturn dsa_port_to_conduit(dp);" in ecm_dsa_patch)
+
     # This is a source/config check, not evidence of actual Wi-Fi offload.
     wifi_config = config.splitlines()
     check("WG2600HP build selects NSS Wi-Fi redirect",
