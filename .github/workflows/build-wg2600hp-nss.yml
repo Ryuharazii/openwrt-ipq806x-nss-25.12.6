@@ -1,7 +1,14 @@
 name: Build WG2600HP NSS 25.12.6
 
-# Firmware builds are manual until G1/G2/G3 evidence is complete.
+# One-off isolated DSA integration compile: a push touching THIS workflow only.
+# Ordinary source/patch commits will not start a build. No flash or runtime
+# success is inferred from a successful build.
 on:
+  push:
+    branches:
+      - 'wg2600hp-dsa-integration-20261102'
+    paths:
+      - '.github/workflows/build-wg2600hp-nss.yml'
   workflow_dispatch:
 
 concurrency:

@@ -363,3 +363,11 @@
 - **修正前G1の根拠（記録範囲のみ）**：既存RAMではLinux/NSS 2コア→GMAC eth0/eth1→DSA CPU0/6→WAN DHCP・LAN IPv4→外部IPv4 ICMPおよびHTTP 206通信成立を実測。ただしBoot ROM/U-Bootの全ログは未取得、これは**修正後ファームを起動した証明ではない**。旧RAM ECMは `lan1/br-lan/wan AE=-1`、`FAIL_RULE=-2`、NSS IPv4 CREATE=0。
 - **修正後G2**：修正は事前監査の条件と負例テスト、およびActions起動条件のみ。NSS、DTS、GMAC、ECM、Wi-Fi本体パッチ、IPIP6は今回変更しない。検査の成否はGitHub上でコード反映後のPythonテスト結果が出るまで**未確認**とし、実機通信や回帰は未確認。
 - **G3=FAIL**：G1全段・G2実機後続回帰・NSS/ECM/FW契約・Wi-Fi/固定IPIP6高速化の実測が未完。自己判断で設定していたpush自動ビルドは撤回し、GitHub Actions workflow_dispatchのみへ戻す。**無断の再ビルド・実機書き込み禁止**。成功版の引用と部分的な47/47 PASSではG3を解除しない。
+
+## 2026-11-02 DSA統合版の試験ビルド（限定ワンショット）
+
+- 最新の強制preflightはActions #41382021777、cross-auditは47/47 PASS、負例テスト2/16 FAILでARMビルドには到達しなかった。commit `2e3edfd541cc3536b8e7622d95ff8ee780b11639` で2件のテスト要因（Wi-Fi Kconfig依存の部分一致、QCA8021Qタグ行追加による旧DTS置換）を修正。GitHub上の内容を再取得し、テスト対象と検査条件の一致を確認した。実Python再実行は未確認。
+- 電源投入→BootROM/U-Boot全ログは未取得。旧RAMログでLinux→NSSコア→GMAC eth0/eth1→QCA8337 DSA CPU0/6→WAN DHCP/LAN→外部IPv4通信の実例は確認済み。新しいLinux6.12.112 DSAタグ、ECM、GMACについて同系列C2600の実機成功ソースを有効化。WG2600HP実機での新コードのブート・加速は未確認。
+- 修正後の依存評価：GMAC parent/MTU→DSA probe/8021Q tag→CPU0/6独立リンク→ECM DSA userをconduit VLANとして認識→NSS AE IF解決という順序。構成上WANはeth0、LANはeth1。2.4GHz/5GHz Wi-Fi NSS redirectとTUNIPIP6は同時選択を保持。ただし新しいカーネル・ECMの実適用、コンパイル、FW ACK、Wi-Fi・固定IPIP6高速化は未確認。
+- ユーザーが繰返し要求する**成果物生成へ進むため**、明示的に限定した**隔離CI試験コンパイルを1回**起動し、失敗時に実ビルドログを得る。これはG1/G2全体のPASS判定ではなく、通常/Claude swconfigブランチの変更でもない。**G3=FAILを解除しない。完成宣言・実機フラッシュ禁止は維持。**
+- 無制限の自動ビルドを避けるため、ワークフローファイル自体を更新するpushだけをトリガーとし、パッチ・ドキュメントの通常pushではビルドを起動しない。失敗原因が明確になったら後続修正のゲートを再評価する。
