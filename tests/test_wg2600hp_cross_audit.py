@@ -10,6 +10,7 @@ import unittest
 REPO = Path(__file__).resolve().parent.parent
 FILES = (
     "scripts/wg2600hp_cross_audit.py",
+    "backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch",
     "scripts/wg2600hp_verify_embedded_dtb.py",
     "scripts/wg2600hp_verify_wifi_nss_binary.py",
     "scripts/wg2600hp_nss_image_gate.sh",
@@ -52,6 +53,19 @@ class CrossAuditTest(unittest.TestCase):
         result = self.run_audit()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("STATIC CROSS-AUDIT PASS", result.stdout)
+
+    def test_detects_ecm_dsa_vlan_hierarchy_flattening(self):
+        self.mutate(
+            "backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch",
+            "+\t\treturn vlan_dev_next_dev(vlan_dev);",
+            "+\t\treturn ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);",
+        )
+        result = self.run_audit()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "FAIL Staged ECM preserves VLAN over DSA hierarchy before NSS conduit",
+            result.stdout,
+        )
 
     def test_detects_kernel_return_value_regression(self):
         path = self.root / "target/linux/ipq806x/patches-6.12/regression.patch"
