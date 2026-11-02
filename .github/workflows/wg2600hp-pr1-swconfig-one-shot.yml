@@ -14,7 +14,7 @@ concurrency:
 jobs:
   wg2600hp:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       SRC: /home/owner/wg2600hp-25.12.6-swconfig
       REF_SHA: 4729abc6daea7b64499f6584066a34d613aa9b2b
@@ -96,6 +96,13 @@ jobs:
           sed -i 's/^PKG_MIRROR_HASH:=8f3f8f04b8850f915a3f6e0d4d9848f50fc89a9ad3980bb325135c9cfde38fc6$/PKG_MIRROR_HASH:=7dd1cdd176e677015ee914afd2cfd996833dc52d9ebac45f3994d0264e4d33a1/' "$p"
           grep -Fxq 'PKG_MIRROR_HASH:=7dd1cdd176e677015ee914afd2cfd996833dc52d9ebac45f3994d0264e4d33a1' "$p"
           printf 'STEP2_MCS_ARCHIVE_PIN\tVERIFIED_FROM_RUN_41358301338\n' >> build-gates.tsv
+          p=package/qca-nss/qca-nss-clients/Makefile
+          grep -Fxq 'PKG_SOURCE_VERSION:=ef082a735fad96bd2f6f59b94d6ea81defc4796e' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=31ce39cc571c1442cd1463891113602671871eeb8531a33c5450a104d8de95c6' "$p"
+          # Run 41363221105 generated the archive from this pinned Git commit.
+          sed -i 's/^PKG_MIRROR_HASH:=31ce39cc571c1442cd1463891113602671871eeb8531a33c5450a104d8de95c6$/PKG_MIRROR_HASH:=69cbbed3932548c37ffad787c95a74a4880335d3c615b51a75d09da7e578284b/' "$p"
+          grep -Fxq 'PKG_MIRROR_HASH:=69cbbed3932548c37ffad787c95a74a4880335d3c615b51a75d09da7e578284b' "$p"
+          printf 'STEP2_CLIENTS_ARCHIVE_PIN\tVERIFIED_FROM_RUN_41363221105\n' >> build-gates.tsv
 
       - name: Configure WG2600HP only
         run: |
@@ -120,7 +127,7 @@ jobs:
         run: |
           cd "$SRC"
           set -o pipefail
-          timeout 2h bash -c 'make -j$(nproc) || make -j1 V=s' 2>&1 | tee build.log
+          timeout 5h bash -c 'make -j$(nproc) || make -j1 V=s' 2>&1 | tee build.log
 
       - name: Verify and stage WG2600HP images
         run: |
