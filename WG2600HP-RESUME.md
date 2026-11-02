@@ -122,3 +122,10 @@
 - 隔離DSA候補760-10のVLAN追加途中失敗時復旧を逆順へ修正（commit `5b287581`）。Linux v6.12.112の実ソースにunified diff2ハンクが一意適用され、同版の逆順走査マクロ存在も確認。修正結果は`WG2600HP-EXECUTION-GATES.md`の2026-11-02追記に保存。
 - 通常ブランチ・ユーザー用VLAN・実機ファームは未変更。G3 FAIL、ARMビルド/起動/オフロードは未確認。
 - 次は隔離760-02/03/04/05/07と既存711系の連携、pinned ECMの`lan1/wan`→NSS物理IF解決、NSS VLAN機能とQCA8337二CPU分離を修正優先で処理。既知のWi-Fi/TUNIPIP6組込み確認を再実施しない。
+
+## 2026-11-02 第25セッション：次回の作業起点（NSS VLANの依存を復活済）
+
+- **最新のソース変更**：DSA隔離ブランチでNSS VLANドライバのKconfig選択を復元 `ead20753`、VLAN managerパッケージと`vlan-mgr=y`を復元 `5ceb64f2`。いずれもdefault offで通常ビルドの選択は変わらない。設定のペア選択候補 `760-11` を `27539567` で追加。ゲート台帳は `2def92f` を参照。
+- **前回ECM実装も保持**：`760-04`のVLAN upper→DSA user→GMAC conduitを1階層ずつ処理する修正 `d529fe86`、パッチ行番号整合 `4cf3ab2`、回帰検出 `6d6abeb`。隔離`760-07`によるQCA8021Q kernel/DTS選択は依然未適用。
+- **次の作業**：固定pinのNSS VLAN manager / ECMの実API契約を確かめ、必要な実装修正を追加し、760-01..11のパッチ依存を成立させてからビルド判断。DSA`wan→eth0`、`lan1..4→eth1`を維持し、ユーザー用VLANは追加しない。NSS IF番号1/2を直接代入しない。通常ブランチやClaudeのswconfig版には介入しない。
+- **未完了**：現行ビルド設定のNSS VLAN非選択、NSS VLAN manager/ECMとFWの実動作、ECM`AE IF=-1`、QCA8K L2双方向分離、Wi-Fi、固定IPIP6。G1/G2未完、G3 FAIL。ARMビルド、ファーム生成、実機RAM起動は未実施。PASSはGitHub保存コードの11項目の限定的整合だけ。
