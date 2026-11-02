@@ -323,3 +323,11 @@
 - **実際のコード変更**：隔離ブランチ `wg2600hp-qca8021q-backport-isolated-20261031` commit `5b2875815d7901662c689a02ecab52c3ad5b80e5`。`backports/staging/760-10-net-dsa-8021q-multiport-rollback-6.12-CANDIDATE.patch` の途中VLAN追加失敗後の先行ポート復旧を、順方向の再走査から、Linux 6.12.112に存在する `dsa_switch_for_each_port_continue_reverse(dp, ds)` へ変更。失敗したポートは復旧対象に含まず、最初のエラー値を返す。
 - **実行した確認**：Linux公式 `gregkh/linux` タグ `v6.12.112` の `net/dsa/tag_8021q.c` と `include/net/dsa.h` を取得。更新したunified diff 2ハンクの旧文脈がそれぞれ一意に一致し、メモリ上の適用に成功（2/2）。マクロ存在・逆順走査・元エラー返却・失敗ポート非対象をコードで確認。最初の検証式が関数直後の EXPORT_SYMBOL_GPL 存在を誤要求してFAILしたが、これはソースがその位置でexportされないことによるテスト側条件誤り。正しい関数本体の検査に変更しPASS、実カーネル動作のPASSとはしない。
 - **未解決・ゲート**：失敗したポート内の部分的ハードウェア書込み、複数スイッチまたがりの原子性、ECMのAE IF=-1、QCA/8021QタグのNSS受理、CPU0/6のWAN/LAN分離、NSS VLAN機能依存、ARMビルド・RAM起動・Wi-Fi/固定IPIP6高速化はいずれも未確認。G1/G2未確認、G3 FAIL。隔離パッチのみ更新し、通常ブランチ・ファーム・ユーザー設定・フラッシュは無変更。
+
+## 2026-11-02 第25セッション続行：760-02 QCA8K VLAN/PVID失敗復旧
+
+- **変更の目的と対象**：QCA8337（WG2600HP/IPQ8064）の内部8021Qタグ候補 `760-02` において、`qca8k_tag_8021q_vlan_add()` がVLAN追加成功後のPVID書込みで失敗した際、VTUのVLAN所属とPVIDソフト状態が残る問題を修正。ユーザーVLAN追加やLAN/WAN設定変更は行わない。
+- **実装コミット**：`c3b588ea08630cee64a9bfdfa25e2d4f35f0dfdb` に失敗したポートのPVIDソフト状態復元、ハードウェアPVID復元、追加したVLAN所属の解放と復旧失敗ログを追加。さらに `6b8154827891d9b3a9982ea903141749d8745899` で、VLAN-aware bridge中はtag用PVIDではなくbridge側PVIDを復旧対象とするよう修正。いずれも隔離ブランチのコード変更。
+- **変更前の横断根拠**：Linux v6.12.112 `drivers/net/dsa/qca/qca8k-common.c` の `qca8k_vlan_add()` はVTU書込み、`qca8k_vlan_del()` は所属削除を担当し、`qca8k_port_vlan_add()` と同様にPVID書込みは後段で行われる。既存 `760-10` は先行ポート復旧を行うが、失敗した当該ポート内の部分更新には対応していなかった。
+- **変更後の確認範囲**：GitHub再取得の実パッチ `760-02` はunified diff全28ハンクのold/new行数整合PASS。元のエラー値を変更せず返却すること、VLAN削除前のPVID復元、復旧失敗のログ、VLAN-aware bridge時の復旧値をコード上で確認。これはソース整合の限定的確認であり、実パッチ適用・ARMコンパイル・HW書込み失敗注入・RAM起動のPASSではない。
+- **未解決のまま**：QCA8KのVLAN LOAD/書込自体の失敗による部分更新、復旧処理中の再失敗、他ポート/他スイッチ原子性、ECM DSA→NSS AE IF mapping、QCA/8021Qデータ転送、WAN/LAN二CPU分離、Wi-Fi NSS、固定IPIP6。G1/G2未確認、G3 FAILを維持。通常ブランチ、既存ファーム、実機設定は無変更。新ビルド・書込みなし。
