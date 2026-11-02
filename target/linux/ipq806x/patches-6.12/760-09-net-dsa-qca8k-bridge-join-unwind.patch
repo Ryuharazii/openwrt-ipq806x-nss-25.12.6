@@ -1,0 +1,69 @@
+From: WG2600HP isolated staging review 2026-11-01
+Subject: [CANDIDATE 760-09] QCA8K bridge-join failure membership unwind
+
+Base: Linux 6.12.112 + OpenWrt 711-01 + staging 760-02.
+If a bridge join fails before its DSA notifier returns success, DSA core
+bypasses BRIDGE_LEAVE notification. Revert QCA8337 member bits explicitly
+and report restoration errors. This does not guarantee rollback if hardware
+MDIO writes fail, or if tag_8021q VLAN writes fail partway through.
+No new user VLAN configuration. STAGING ONLY; no build/flash approval.
+
+---
+--- a/drivers/net/dsa/qca/qca8k-common.c
++++ b/drivers/net/dsa/qca/qca8k-common.c
+@@ -765,22 +765,33 @@
+-int qca8k_port_bridge_join(struct dsa_switch *ds, int port,
+-			   struct dsa_bridge bridge,
+-			   bool *tx_fwd_offload,
+-			   struct netlink_ext_ack *extack)
+-{
+-	struct qca8k_priv *priv = ds->priv;
+-	int ret;
+-
+-	ret = qca8k_update_port_member(priv, port, bridge.dev, true);
+-	if (ret)
+-		return ret;
+-
+-	/* Under tag_8021q the port swaps its standalone VLAN for the
+-	 * bridge's, so the switch forwards between the bridge's ports on
+-	 * its own and the CPU can send to all of them with one tag.
+-	 */
+-	if (priv->tag_proto == DSA_TAG_PROTO_QCA_8021Q)
+-		return dsa_tag_8021q_bridge_join(ds, port, bridge,
+-						 tx_fwd_offload, extack);
+-
+-	return 0;
+-}
++int qca8k_port_bridge_join(struct dsa_switch *ds, int port,
++			   struct dsa_bridge bridge,
++			   bool *tx_fwd_offload,
++			   struct netlink_ext_ack *extack)
++{
++	struct qca8k_priv *priv = ds->priv;
++	int ret, rollback_ret;
++
++	ret = qca8k_update_port_member(priv, port, bridge.dev, true);
++	if (ret)
++		goto rollback_membership;
++
++	/* Under tag_8021q the port swaps its standalone VLAN for the
++	 * bridge's, so the switch forwards between the bridge's ports on
++	 * its own and the CPU can send to all of them with one tag.
++	 */
++	if (priv->tag_proto == DSA_TAG_PROTO_QCA_8021Q) {
++		ret = dsa_tag_8021q_bridge_join(ds, port, bridge,
++						 tx_fwd_offload, extack);
++		if (ret)
++			goto rollback_membership;
++	}
++
++	return 0;
++
++rollback_membership:
++	/* A failed bridge join must not retain changes to peer port masks. */
++	rollback_ret = qca8k_update_port_member(priv, port, bridge.dev, false);
++	if (rollback_ret)
++		dev_err(priv->dev, "failed to revert port %d membership: %d\n",
++			port, rollback_ret);
++	return ret;
++}

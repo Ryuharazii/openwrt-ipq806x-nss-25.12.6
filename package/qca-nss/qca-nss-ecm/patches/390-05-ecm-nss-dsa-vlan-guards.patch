@@ -1,0 +1,111 @@
+From: WG2600HP pinned ECM source backport staging
+Subject: [PATCH] ecm: skip real-VLAN-only operations on 802.1Q-tagged DSA ports
+
+Pinned ECM SHA: 9acdcb05c04ae177a79c4c34cef0487fbcedbfaa
+Source adapted from kuncy7/nss-packages 0051, to complement 760-04.
+Do not install without kernel tagger, DSA, ECΜ and RAM-boot checks.
+Not compile verified.
+
+---
+--- a/frontends/nss/ecm_nss_multicast_ipv4.c
++++ b/frontends/nss/ecm_nss_multicast_ipv4.c
+@@ -1153,7 +1153,7 @@
+ 
+ 				vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 				if (vlan_out_dev) {
+-					vlan_prio = vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++					vlan_prio = is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 					create->if_rule[valid_vif_idx].egress_vlan_tag[interface_type_counts[ii_type]] |= vlan_prio;
+ 					dev_put(vlan_out_dev);
+ 					vlan_out_dev = NULL;
+--- a/frontends/nss/ecm_nss_multicast_ipv6.c
++++ b/frontends/nss/ecm_nss_multicast_ipv6.c
+@@ -1124,7 +1124,7 @@
+ 
+ 				vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 				if (vlan_out_dev) {
+-					vlan_prio = vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++					vlan_prio = is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 					create->if_rule[valid_vif_idx].egress_vlan_tag[interface_type_counts[ii_type]] |= vlan_prio;
+ 					dev_put(vlan_out_dev);
+ 					vlan_out_dev = NULL;
+--- a/frontends/nss/ecm_nss_non_ported_ipv4.c
++++ b/frontends/nss/ecm_nss_non_ported_ipv4.c
+@@ -773,7 +773,7 @@
+ 			 */
+ 			vlan_in_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_in_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_in_dev) ? vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag) : 0;
+ 				dev_put(vlan_in_dev);
+ 				vlan_in_dev = NULL;
+ 			}
+@@ -1004,7 +1004,7 @@
+ 			 */
+ 			vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_out_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 				dev_put(vlan_out_dev);
+ 				vlan_out_dev = NULL;
+ 			}
+--- a/frontends/nss/ecm_nss_non_ported_ipv6.c
++++ b/frontends/nss/ecm_nss_non_ported_ipv6.c
+@@ -680,7 +680,7 @@
+ 			 */
+ 			vlan_in_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_in_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_in_dev) ? vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag) : 0;
+ 				dev_put(vlan_in_dev);
+ 				vlan_in_dev = NULL;
+ 			}
+@@ -903,7 +903,7 @@
+ 			 */
+ 			vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_out_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 				dev_put(vlan_out_dev);
+ 				vlan_out_dev = NULL;
+ 			}
+--- a/frontends/nss/ecm_nss_ported_ipv4.c
++++ b/frontends/nss/ecm_nss_ported_ipv4.c
+@@ -609,7 +609,7 @@
+ 			 */
+ 			vlan_in_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_in_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_in_dev) ? vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag) : 0;
+ 				dev_put(vlan_in_dev);
+ 				vlan_in_dev = NULL;
+ 			}
+@@ -894,7 +894,7 @@
+ 			 */
+ 			vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_out_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 				dev_put(vlan_out_dev);
+ 				vlan_out_dev = NULL;
+ 			}
+--- a/frontends/nss/ecm_nss_ported_ipv6.c
++++ b/frontends/nss/ecm_nss_ported_ipv6.c
+@@ -603,7 +603,7 @@
+ 			 */
+ 			vlan_in_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_in_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_in_dev) ? vlan_dev_get_egress_qos_mask(vlan_in_dev, pr->return_qos_tag) : 0;
+ 				dev_put(vlan_in_dev);
+ 				vlan_in_dev = NULL;
+ 			}
+@@ -864,7 +864,7 @@
+ 			 */
+ 			vlan_out_dev = dev_get_by_index(&init_net, ecm_db_iface_interface_identifier_get(ii));
+ 			if (vlan_out_dev) {
+-				vlan_value |= vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag);
++				vlan_value |= is_vlan_dev(vlan_out_dev) ? vlan_dev_get_egress_qos_mask(vlan_out_dev, pr->flow_qos_tag) : 0;
+ 				dev_put(vlan_out_dev);
+ 				vlan_out_dev = NULL;
+ 			}

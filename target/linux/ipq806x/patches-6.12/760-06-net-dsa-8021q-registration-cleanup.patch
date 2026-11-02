@@ -1,0 +1,29 @@
+From: WG2600HP IPQ8064 isolated candidate
+Subject: [PATCH] net: dsa: 8021q: unwind partial registration before freeing context
+
+Linux baseline: v6.12.112; apply after the staged 760-03 tag_8021q dual-CPU isolation patch.
+
+Failure in dsa_tag_8021q_setup() can occur after prior user ports
+have installed VLAN membership and conduit RX filters. A bare kfree()
+leaves ds->tag_8021q_ctx dangling and leaks partial hardware state.
+Use the existing unregister path to undo programming and release the
+context. Revalidation of failure cleanup on WG2600HP is required.
+Staging only: not integrated, compiled or tested on hardware.
+
+---
+--- a/net/dsa/tag_8021q.c
++++ b/net/dsa/tag_8021q.c
+@@ -443,9 +443,12 @@
+ 		goto err_free;
+ 
+ 	return 0;
+ 
+ err_free:
+-	kfree(ctx);
++	/* Setup can fail after some ports have been programmed. Unwind their
++	 * VLANs, release the context and clear ds->tag_8021q_ctx.
++	 */
++	dsa_tag_8021q_unregister(ds);
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(dsa_tag_8021q_register);

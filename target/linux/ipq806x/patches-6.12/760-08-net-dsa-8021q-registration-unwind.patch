@@ -1,0 +1,79 @@
+From: WG2600HP isolated staging review 2026-11-01
+Subject: [CANDIDATE 760-08] DSA 8021Q prefix setup unwind and RX filter errors
+
+Base: Linux 6.12.112 after staging 760-03 and 760-06.
+Rollback the completed setup prefix only, check vlan_vid_add(), and clear
+ctx on error. Broadcast VLAN partial hardware writes still require recovery.
+STAGING ONLY; not compiled or tested on WG2600HP; no build/flash approval.
+
+---
+--- a/net/dsa/tag_8021q.c
++++ b/net/dsa/tag_8021q.c
+@@ -370,4 +370,8 @@
+-	/* Add the VLAN to the conduit's RX filter. */
+-	vlan_vid_add(conduit, ctx->proto, vid);
+-
+-	return err;
++	/* An RX filter error must not leave the switch VLAN installed. */
++	err = vlan_vid_add(conduit, ctx->proto, vid);
++	if (err) {
++		dsa_port_tag_8021q_vlan_del(dp, vid, false);
++		return err;
++	}
++
++	return 0;
+@@ -396,18 +400,24 @@
+-static int dsa_tag_8021q_setup(struct dsa_switch *ds)
+-{
+-	int err, port;
+-
+-	ASSERT_RTNL();
+-
+-	for (port = 0; port < ds->num_ports; port++) {
+-		err = dsa_tag_8021q_port_setup(ds, port);
+-		if (err < 0) {
+-			dev_err(ds->dev,
+-				"Failed to setup VLAN tagging for port %d: %pe\n",
+-				port, ERR_PTR(err));
+-			return err;
+-		}
+-	}
+-
+-	return 0;
+-}
++static int dsa_tag_8021q_setup(struct dsa_switch *ds)
++{
++	int err, port;
++
++	ASSERT_RTNL();
++
++	for (port = 0; port < ds->num_ports; port++) {
++		err = dsa_tag_8021q_port_setup(ds, port);
++		if (err < 0) {
++			dev_err(ds->dev,
++				"Failed to setup VLAN tagging for port %d: %pe\n",
++				port, ERR_PTR(err));
++			goto rollback;
++		}
++	}
++
++	return 0;
++
++rollback:
++	/* Only prior ports completed setup; current setup cleaned itself. */
++	while (--port >= 0)
++		dsa_tag_8021q_port_teardown(ds, port);
++	return err;
++}
+@@ -447,6 +457,5 @@
+-err_free:
+-	/* Setup can fail after some ports have been programmed. Unwind their
+-	 * VLANs, release the context and clear ds->tag_8021q_ctx.
+-	 */
+-	dsa_tag_8021q_unregister(ds);
+-	return err;
++err_free:
++	/* Setup rolled back exactly the completed prefix. */
++	ds->tag_8021q_ctx = NULL;
++	kfree(ctx);
++	return err;
