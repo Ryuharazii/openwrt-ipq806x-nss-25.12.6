@@ -338,3 +338,12 @@
 - **依存・根拠**：Linux 6.12.112の `include/net/dsa.h` に `dsa_port_bridge_num_get` と `dsa_port_to_conduit`、`include/linux/dsa/8021q.h` にVLAN VID APIが存在。`net/dsa/dsa.c` の `dsa_port_from_netdev`、`net/dsa/user.c` の `dsa_user_dev_check`、`net/dsa/tag_8021q.c` のbridge/standalone VID APIは各々GPLエクスポートを確認。ただし pinned ECM `9acdcb05` の全ソースに対する実patch適用とARMコンパイルは未確認。
 - **回帰検出を実装**：`scripts/wg2600hp_cross_audit.py` に階層保持チェック（`9aaa128abc6cb2f6c591e0c44e47000baf4983a8`、`eb0918ac75f1930b2651abfe5e9a0ee269a02859`）、`tests/test_wg2600hp_cross_audit.py` に旧い階層短絡を復元するとFAILする負例（`6d6abeb22753afb5c5deb83bfed24e2cbd945cde`）を追加。GitHubからパッチ・監査・テストを読み戻し、コード要件の陽性・負例判定をJS文字列ベースで確認。Python unittest自体は未実行でPASSとはしていない。
 - **境界**：WAN→eth0、LAN→eth1の既存設定を保持。通常作業ブランチ未変更、ユーザー用VLAN追加なし。既存の `AE IF=-1` / `FAIL_RULE=-2` / `NSS IPv4 CREATE=0` を修正版実機で解消した証拠は未取得。NSS VLAN機能、QCA8337二CPU分離、Wi-Fi NSS、固定IPIP6は未解決。G1/G2未完了、G3 FAIL。新規ARMビルド・RAM起動・書込みは行っていない。
+
+## 2026-11-02 第25セッション続行：NSS VLANドライバ／クライアントのビルド依存を実装
+
+- **開始時の証拠**：従来の `diff-wg2600hp-nss` では `CONFIG_NSS_DRV_VLAN_ENABLE` と `kmod-qca-nss-drv-vlan-mgr` が未選択。ドライバの `Config.in` はVLAN選択をコメントアウト、clients `Makefile` もVLANマネージャ定義・`vlan-mgr=y`・`KernelPackage` 登録が無効。ドライバ `Makefile` は設定欠落時に `NSS_DRV_VLAN_ENABLE=n` を渡す。
+- **公開実装との照合**：`ACwifidude/nss-packages` `NSS-11.2-K5.15` ブランチの `qca-nss-drv/Config.in` と `qca-nss-clients/Makefile` は同系列のNSS VLAN選択、IPQ806x対応パッケージ定義、`vlan-mgr=y` を持つ。参照URL: https://github.com/ACwifidude/nss-packages/blob/NSS-11.2-K5.15/qca-nss-clients/Makefile 。ただしこの版のLinux 6.12.112／現行固定pin／11.x FW互換性までは証明しない。
+- **実施したソース修正**：隔離ブランチの `package/qca-nss/qca-nss-drv/Config.in` にdefault nの選択を復活（`ead207537f2adf9da8d8b6cf83632dd780901261`）。`package/qca-nss/qca-nss-clients/Makefile` のNSS VLAN managerパッケージ宣言、IPQ806xターゲット、`NSS_DRV_VLAN_ENABLE`依存、条件付き`vlan-mgr=y`、パッケージ登録を復活（`5ceb64f2a045bdec1e04c437b265bb569eafc2d0`）。
+- **統合選択の候補**：`backports/staging/760-11-wg2600hp-nss-vlan-build-selection-CANDIDATE.patch` に二つの`.config` 選択を記載（`2753956771a7f55465688ab1e26586ae5455d17c`）。現在の`diff-wg2600hp-nss`には未適用。候補unified diffのold文脈10行は現行ファイルと完全一致、old/newの行数10/12一致。
+- **修正後の確認**：隔離GitHub保存内容を再取得。Kconfig、NSS drvのデフォルト無効分岐、clients IPQ806x宣言、ドライバ依存・ビルド引数・eval、候補選択2項目、現行ビルド設定非変更の合計11項目を静的確認し11/11一致。ビルド／ランタイムPASSには相当しない。
+- **未解決のゲート**：現行NSSドライバ`3cfb9f43`＋clients`ef082a735fad96bd2f6f59b94d6ea81defc4796e`のVLAN manager実ビルドとFW対応、ECM`9acdcb05`でのVLAN AE interface番号解決、DSA internal VIDのNSSルール投入、QCA8337の二CPU分離と有線IPv4、Wi-Fi NSSと固定IPIP6。既存実機の `AE IF=-1` / `CREATE=0` はまだ修正後実測なし。G1/G2未完了、G3 FAIL、新規ARMビルド・RAM起動・ファーム生成なし。通常ブランチと実機設定は無変更。
