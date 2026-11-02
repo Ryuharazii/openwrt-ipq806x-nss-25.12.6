@@ -103,7 +103,7 @@ NOT YET COMPILE VERIFIED.
  
  /*
   * ecm_interface_dev_find_by_local_addr_ipv4()
-@@ -3114,14 +3163,22 @@
+@@ -3114,14 +3168,22 @@
  		/*
  		 * VLAN?
  		 */
@@ -130,7 +130,7 @@ NOT YET COMPILE VERIFIED.
  			DEBUG_TRACE("%px: Net device: %px is VLAN, mac: %pM, vlan_id: %x vlan_tpid: %x\n",
  					feci, dev, type_info.vlan.address, type_info.vlan.vlan_tag, type_info.vlan.vlan_tpid);
  
-@@ -3989,7 +4046,7 @@
+@@ -3989,7 +4051,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -139,7 +139,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -5213,7 +5270,7 @@
+@@ -5213,7 +5275,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -148,7 +148,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -6157,7 +6214,7 @@
+@@ -6157,7 +6219,7 @@
  				/*
  				 * VLAN?
  				 */
@@ -157,7 +157,7 @@ NOT YET COMPILE VERIFIED.
  					/*
  					 * VLAN master
  					 * No locking needed here, ASSUMPTION is that real_dev is held for as long as we have dev.
-@@ -6818,7 +6875,8 @@
+@@ -6818,7 +6880,8 @@
  			stats.tx_packets = tx_packets;
  			stats.tx_bytes = tx_bytes;
  			DEBUG_INFO("vlan call to update status:rx pkt:%u tx pkt:%u", rx_packets, tx_packets);
