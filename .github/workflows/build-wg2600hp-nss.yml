@@ -2,6 +2,9 @@ name: WG2600HP swconfig NSS 25.12.6 isolated firmware
 
 # Manual invocation only after the five project gates are satisfied.
 on:
+  push:
+    branches:
+      - wg2600hp-swconfig-integration-20261102
   workflow_dispatch:
 
 permissions:

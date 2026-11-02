@@ -27,3 +27,7 @@ Target: `nec,wg2600hp` / IPQ8064; swconfig only. Source reviewed at `d3265b28532
 - G5: no new RAM image or complete hardware NSS measurements. **NOT RUN**.
 
 Next: inspect the pinned external NSS clients and driver source (especially tunnel notifier, create/destroy and error paths) and the full effective kernel patch stack; record exact end-to-end boot hardware evidence before declaring cross-review passed. Do **not** modify DSA, GMAC, switch configuration, boot image, or launch build based on this partial audit.
+
+## Build invocation decision (2026-11-02)
+
+The user requested to **proceed**, after explicitly prohibiting another loop of static-only review. Previous source audit details and unverified runtime issues are preserved above, not reclassified as PASS. These unverified runtime measurements can only be obtained after building and RAM boot. No source-level failure is currently proven by the gate evidence, and the exact WG2600HP GMAC DTS hunks were matched against the committed source. CI is therefore allowed to run as a controlled **diagnostic compile only** (not a declaration of Gate 2 or Gate 4 PASS and not firmware ready for flashing). The manual-only GitHub Actions workflow cannot currently be dispatched through the available tool, so it gains a single-branch `push` trigger for **this integration branch only**. Its branch guard, compile and artifact checks remain unchanged. No router modification or flash is permitted.
