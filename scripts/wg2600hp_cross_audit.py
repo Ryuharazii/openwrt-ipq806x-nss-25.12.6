@@ -138,8 +138,7 @@ def main():
     walk_start = ecm_dsa_patch.find(
         "+static inline struct net_device *ecm_interface_vlan_real_dev(")
     walk_end = ecm_dsa_patch.find(
-        "\n /*\n  * ecm_interface_dev_find_by_local_addr_ipv4()"
-, walk_start)
+        "\n /*\n  * ecm_interface_dev_find_by_local_addr_ipv4()", walk_start)
     walk = ecm_dsa_patch[walk_start:walk_end] if walk_start >= 0 and walk_end > walk_start else ""
     check("Staged ECM preserves VLAN over DSA hierarchy before NSS conduit",
           "+\tif (is_vlan_dev(vlan_dev))\n+\t\treturn vlan_dev_next_dev(vlan_dev);" in walk
