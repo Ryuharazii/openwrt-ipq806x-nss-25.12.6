@@ -1,23 +1,23 @@
-# WG2600HP DSA integration worktree — 2026-11-02
+# WG2600HP DSA統合版（2026-11-02）現在状態
 
-Base: 6582f1b8c15e7b024fac675a9bd5c11a831355d4
+作業ブランチ: `wg2600hp-dsa-integration-20261102`（Claude担当swconfig版と分離）。
 
-This branch applies the isolated DSA/ECM candidates to OpenWrt build inputs, without touching Claude's swconfig branch or the earlier isolated branch.
+## 有効なLinux 6.12実装
 
-* Linux 6.12: the existing generic 760-01 tagger is retained; new 760-02/03/06/08/09/10 are installed in **ipq806x-only** kernel patches.
-* ECM pinned 9acdcb05: candidate 760-04/05 are installed as 390-04/05, before the existing kernel 6.12 support patches 400/401.
-* WG2600HP DTS CPU ports 0 and 6 select qca-8021q; ipq806x config adds NET_DSA_TAG_QCA_8021Q.
-* The WG2600HP-specific diff config selects NSS_DRV_VLAN_ENABLE=y and kmod-qca-nss-drv-vlan-mgr=y; the VLAN Kconfig and client build definitions were restored on the source isolated branch.
-* WAN→eth0 and LAN1–4→eth1 are unchanged. No UCI VLANs added.
+- 実機C2600でDSA＋NSS高速化を報告した `gyimesibalazs/openwrt-ipq806x-nss-25.12` の `dsa-lab` を参照。
+- `target/linux/generic/pending-6.12/713`（QCA8337 802.1Q、2 CPU VLAN分離）、`714-01/02`（MAC_PWR_SEL DT）、`716`（MDIO read）を有効化。
+- `package/qca-nss/qca-nss-ecm/patches/402`（DSA user port→NSS conduit）、`package/qca-nss/qca-nss-gmac/patches/09/10`（MTUとGMAC親ノード）を有効化。
+- 旧独自 `760-01/02/03/06/08/09/10` と `390-04/05`、旧GMAC 09は有効パッチディレクトリから外した。比較用stagingは保持。
+- WG2600HP DTS CPU0→gmac1/eth0（WAN）、CPU6→gmac2/eth1（LAN）を保持、`dsa-tag-protocol = "qca-8021q"`、RGMII1電圧フラグを成功版と一致させた。**ユーザーVLAN追加なし**。
+- 成功例で必要としていない `CONFIG_NSS_DRV_VLAN_ENABLE` とVLAN managerの明示選択はWG2600HP `diff`から撤回。ドライバKconfig/Makefileの選択肢は以前復活させたがデフォルト無効。
+- WG2600HP `diff`はNSS GMAC/DRV/ECM、Wi-Fi NSS redirect、TUNIPIP6 module/driver、IPv6を選択。選択≠高速化成功。
 
-**Verified here:** exact old-context matching for the 760-07 and 760-11 OpenWrt source hunks; staged patch file copies. This is *integration only*, not evidence that the 760-02/03/06/08/09/10 Linux and 390-04/05 ECM patches all apply without error.
+## GitHub Actions結果とゲート
 
-**Not yet verified:** quilt kernel/ECM patch application; fixed pinned upstream ECM source compilation; NSS VLAN module and firmware compatibility; IPQ8064 DSA dual-CPU isolation; ARM build; RAM boot; IPv4 NSS flow creation; Wi-Fi NSS and fixed IPIP6 acceleration.
+- [#41382021777](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41382021777) は **preflight FAIL（unittest 2/16）**。ARMビルドにもファーム生成にも到達せず。
+- 今回の2件は古いテスト条件の誤り。Wi-Fi依存の部分一致を完全一致へ、DSA CPU0モードテストは新しいタグ行を考慮して修正。
+- Workflowのpush自動実行を解除。以後は手動dispatchのみで、ビルド前G1/G2/G3の根拠を要確認。
+- **G1/G2未完、G3 FAIL、G4未達、G5/G6新ファーム未実施。** 旧RAM版はIPv4通信成立・NSS IPv4ルールCREATE=0。
+- Wi-Fi NSS実機高速化、固定IPIP6のIF確保・停止解放およびNSS FW ACKは未実証。
 
-Do not flash. G1/G2 unresolved, G3 FAIL until all patch stack and API dependencies are resolved. No completed firmware.
-
-## Kernel patch order: baseline source-context simulation
-
-- The integrated Linux patch sequence tested against upstream Linux 6.12.112 was generic `711-01`, `711-02`, `711-03`, **`712`**, `760-01`, then ipq806x `760-02`, `760-03`, `760-06`, `760-08`, `760-09`, `760-10`. All **50** hunks matched and were transformed in memory using old/new unified-diff context. This is a source-context simulation, **not** the OpenWrt quilt/ARM build.
-- A first simulation erroneously omitted existing `712`, incorrectly suggesting that `760-02` conflicted with `711-03`. Including `712` removes that false failure. Another snippet in `760-02` at qca8k-common.c old line 881 matched two nearby locations; this simulation selected the position nearest the declared old location. The real patch utility has not independently confirmed this placement.
-- The ECM `390-04`/`390-05` patch stack has not been applied to the **exact** pinned ECM source together with `400`/`401`. No proof of kernel/ECM compile, NSS rule creation, firmware, RAM-boot or two-CPU datapath. G3 FAIL remains.
+作業履歴の詳細は `WG2600HP-EXECUTION-GATES.md`。上流成功実装の利用・自動CI成功・静的テストをWG2600HP実機の動作PASSと混同しない。

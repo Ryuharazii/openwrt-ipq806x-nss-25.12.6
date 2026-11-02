@@ -353,3 +353,13 @@
 - 統合ブランチ `wg2600hp-dsa-integration-20261102` に `ad3e57df63ed92d4410346401723c4369fd43a34` でLinux側760-02/03/06/08/09/10、ECM側390-04/05、DTS・DSAカーネル設定・WG2600HP専用NSS VLAN選択をビルド入力へ反映。通常ブランチ・swconfig版には変更なし。
 - generic `711-01/02/03`→`712`→`760-01`、ipq806x `760-02/03/06/08/09/10` の順に、Linux v6.12.112原ソースに対する計50ハンクの文脈一致・メモリ上の変換が完走。途中で`712`を除外して発生した擬似失敗は補正済。一箇所は複数文脈一致を原行位置の近傍で判別したため、実際のパッチユーティリティによる適用確認は残る。証拠は `WG2600HP-DSA-INTEGRATION-20261102.md`。
 - **G1/G2未完、G3 FAIL**：固定pin ECMに390-04/05と既存400/401が適用できること、ARMビルド、NSS VLAN manager・FW互換性、ECMのAE IF番号解決、DSA二CPUの分離・IPv4双方向通信を未確認。従ってG3の条件に従いビルドとファーム書込みは未実施。カーネル側ソース文脈一致は実装の一部検査でありビルドPASSではない。
+
+## 2026-11-02 DSA成功実装の取込みとCI失敗の確定（5ゲート維持）
+
+- DSA隔離統合ブランチのcommit `e31dd6f4ca12d3848f5955da5629dbd99eb15652` で、実機NSS成功報告のある `gyimesibalazs/openwrt-ipq806x-nss-25.12` の `dsa-lab`（Linux 6.12）から kernel 713/714/716、ECM 402、GMAC 09/10をビルド入力へ導入。独自760統合スタックを退避・非適用に戻し、ユーザー向けVLAN設定は増やしていない。WG2600HP用DTSにはRGMII1 MAC_PWR_SELフラグを追加。今回のCI対象commitは `4df5b2b85d5c127397661ad20baba1c3b1e03d7d`。
+- 実行されたGitHub Actions [#41382021777](https://github.com/Ryuharazii/openwrt-ipq806x-nss-25.12.6/actions/runs/41382021777) は **FAIL**。設定ステップは到達、cross_auditのソースチェック47/47 PASS、Python unittest16件中2件FAIL。**Download、ARM make、ファーム生成には未到達**。
+- 失敗① `test_detects_missing_wifi_nss_build_config_dependency`：Wi-Fi設定の負例が `CONFIG_PACKAGE_MAC80211_NSS_SUPPORT_REMOVED` という部分文字列を保持し、監査側の `in` 条件を誤って満たしていた。exact-token分割に変更し、元の依存リストと差分に照合。
+- 失敗② `test_detects_wrong_dsa_cpu_port_mode`：成功版WG2600HP DTSに追加された `dsa-tag-protocol = "qca-8021q";` 行を旧テストの置換対象が考慮していなかった。CPU0 GMAC1 RGMIIの1行差分に合わせて負例の置換対象を修正。CPU6 GMAC2 SGMII、LAN1～4→eth1、WAN→eth0は変更しない。
+- **修正前G1の根拠（記録範囲のみ）**：既存RAMではLinux/NSS 2コア→GMAC eth0/eth1→DSA CPU0/6→WAN DHCP・LAN IPv4→外部IPv4 ICMPおよびHTTP 206通信成立を実測。ただしBoot ROM/U-Bootの全ログは未取得、これは**修正後ファームを起動した証明ではない**。旧RAM ECMは `lan1/br-lan/wan AE=-1`、`FAIL_RULE=-2`、NSS IPv4 CREATE=0。
+- **修正後G2**：修正は事前監査の条件と負例テスト、およびActions起動条件のみ。NSS、DTS、GMAC、ECM、Wi-Fi本体パッチ、IPIP6は今回変更しない。検査の成否はGitHub上でコード反映後のPythonテスト結果が出るまで**未確認**とし、実機通信や回帰は未確認。
+- **G3=FAIL**：G1全段・G2実機後続回帰・NSS/ECM/FW契約・Wi-Fi/固定IPIP6高速化の実測が未完。自己判断で設定していたpush自動ビルドは撤回し、GitHub Actions workflow_dispatchのみへ戻す。**無断の再ビルド・実機書き込み禁止**。成功版の引用と部分的な47/47 PASSではG3を解除しない。

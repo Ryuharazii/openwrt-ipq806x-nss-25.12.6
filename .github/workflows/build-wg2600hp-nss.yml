@@ -1,10 +1,7 @@
 name: Build WG2600HP NSS 25.12.6
 
-# Integration-branch-only build; production branches remain manual.
+# Firmware builds are manual until G1/G2/G3 evidence is complete.
 on:
-  push:
-    branches:
-      - 'wg2600hp-dsa-integration-20261102'
   workflow_dispatch:
 
 concurrency:
