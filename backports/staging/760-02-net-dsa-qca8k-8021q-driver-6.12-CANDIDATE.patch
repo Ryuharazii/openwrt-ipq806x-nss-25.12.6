@@ -799,7 +799,7 @@ Do not enable new tag protocol on real hardware.
  	ret = qca8k_vlan_add(priv, port, vlan->vid, untagged);
  	if (ret) {
  		dev_err(priv->dev, "Failed to add VLAN to port %d (%d)", port, ret);
-@@ -1031,26 +1339,91 @@
+@@ -1031,26 +1339,92 @@
  	}
  
  	if (pvid) {
@@ -829,6 +829,8 @@ Do not enable new tag protocol on real hardware.
 +	bool pvid = flags & BRIDGE_VLAN_INFO_PVID;
 +	struct qca8k_priv *priv = ds->priv;
 +	u16 previous_pvid = priv->tag_8021q_pvid[port];
++	bool vlan_aware = dsa_port_is_vlan_filtering(dsa_to_port(ds, port));
++	u16 previous_hw_pvid = vlan_aware ? priv->bridge_pvid[port] : previous_pvid;
 +	int ret, rollback_ret;
 +
 +	ret = qca8k_vlan_add(priv, port, vid, untagged);
@@ -840,13 +842,12 @@ Do not enable new tag protocol on real hardware.
  
 +	if (pvid) {
 +		priv->tag_8021q_pvid[port] = vid;
-+		ret = qca8k_commit_pvid(ds, port,
-+					dsa_port_is_vlan_filtering(dsa_to_port(ds, port)));
++		ret = qca8k_commit_pvid(ds, port, vlan_aware);
 +		if (ret) {
 +			/* Restore the PVID before removing the newly added VLAN. */
 +			priv->tag_8021q_pvid[port] = previous_pvid;
 +			rollback_ret = qca8k_port_set_pvid(priv, port,
-+				previous_pvid ? previous_pvid : QCA8K_PORT_VID_DEF);
++				previous_hw_pvid ? previous_hw_pvid : QCA8K_PORT_VID_DEF);
 +			if (rollback_ret)
 +				dev_err(priv->dev, "PVID rollback failed on port %d (%d)\n",
 +					port, rollback_ret);
