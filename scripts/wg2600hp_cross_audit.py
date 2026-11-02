@@ -58,6 +58,7 @@ def main():
     runtime = read("target/linux/ipq806x/base-files/usr/sbin/wg2600hp-net-audit")
     mac80211 = read("package/kernel/mac80211/Makefile")
     wifi_redirect = read("package/kernel/mac80211/patches/subsys/990-mac80211-add-nss-redirect-support.patch")
+    ecm_dsa_patch = read("backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch")
 
     # 1. Catch the Linux return-value contract regression before boot.
     patches = ROOT.glob("target/linux/ipq806x/patches-6.12/*.patch")
@@ -132,6 +133,18 @@ def main():
         check("Network %s -> %s conduit" % (name, conduit),
               'ucidef_set_network_device_conduit "%s" "%s"' % (name, conduit) in block)
 
+    # Preserve both the explicit VLAN VID and the internal DSA 8021Q VID.
+    # Flattening VLAN upper -> NSS conduit would erase the DSA VLAN layer.
+    walk_start = ecm_dsa_patch.find(
+        "+static inline struct net_device *ecm_interface_vlan_real_dev(")
+    walk_end = ecm_dsa_patch.find(
+        "\n /*\n  * ecm_interface_dev_find_by_local_addr_ipv4()"
+, walk_start)
+    walk = ecm_dsa_patch[walk_start:walk_end] if walk_start >= 0 and walk_end > walk_start else ""
+    check("Staged ECM preserves VLAN over DSA hierarchy before NSS conduit",
+          "+\tif (is_vlan_dev(vlan_dev))\n+\t\treturn vlan_dev_next_dev(vlan_dev);" in walk
+          and "+\treturn ecm_interface_dsa_8021q_conduit(vlan_dev, NULL);" in walk
+          and "return conduit ? conduit : real" not in walk)
     # 6. Keep NSS Wi-Fi redirect enabled, and rebuild mac80211 on a toggle.
     # This is a source/config check, not evidence of actual Wi-Fi offload.
     wifi_config = config.splitlines()
