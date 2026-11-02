@@ -1,0 +1,27 @@
+From: WG2600HP IPQ8064 isolated DSA integration
+Subject: [CANDIDATE 760-11] select NSS VLAN driver and manager with 8021Q DSA
+
+Requires 760-01..760-10, pinned ECM 760-04/05 and confirmation of
+NSS VLAN firmware/manager compatibility on IPQ8064/NSS FW 11.x.
+This patch is NOT applied to active build configuration. No firmware
+is approved while G1/G2/G3 fail. Do not require UCI VLAN changes.
+760-07 selects DSA 8021Q on the two CPU ports; this selects only the
+NSS VLAN driver and manager dependencies. The Kconfig option and
+client manager are already made selectable in the isolated branch.
+
+---
+--- a/diff-wg2600hp-nss
++++ b/diff-wg2600hp-nss
+@@ -10,10 +10,12 @@
+ CONFIG_PACKAGE_kmod-qca-nss-drv=y
+ CONFIG_PACKAGE_kmod-qca-nss-ecm-standard=y
+ CONFIG_PACKAGE_kmod-qca-nss-drv-tunipip6=y
++CONFIG_PACKAGE_kmod-qca-nss-drv-vlan-mgr=y
+ CONFIG_PACKAGE_kmod-qca-mcs=y
+ CONFIG_NSS_DRV_IPV6_ENABLE=y
+ CONFIG_NSS_DRV_VIRT_IF_ENABLE=y
++CONFIG_NSS_DRV_VLAN_ENABLE=y
+ CONFIG_NSS_DRV_WIFI_ENABLE=y
+ CONFIG_NSS_DRV_PPPOE_ENABLE=y
+ CONFIG_NSS_DRV_PPTP_ENABLE=y
+ CONFIG_NSS_DRV_TUNIPIP6_ENABLE=y
