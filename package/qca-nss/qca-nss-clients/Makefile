@@ -171,22 +171,22 @@ endef
 #Kernel modules for NSS bridge manager
 #endef
 
-#define KernelPackage/qca-nss-drv-vlan-mgr
-#  SECTION:=kernel
-#  CATEGORY:=Kernel modules
-#  SUBMENU:=Network Devices
-#  TITLE:=Kernel driver for NSS vlan manager
-#  DEPENDS:=@TARGET_ipq_ipq807x||TARGET_ipq_ipq806x||TARGET_ipq807x||TARGET_ipq_ipq60xx||TARGET_ipq_ipq60xx_64||TARGET_ipq60xx \
-#		+PACKAGE_kmod-qca-nss-drv:kmod-qca-nss-drv \
-#	   +@NSS_DRV_VLAN_ENABLE \
-#	   +PACKAGE_kmod-bonding:kmod-bonding
-#  FILES:=$(PKG_BUILD_DIR)/vlan/qca-nss-vlan.ko
-#  AUTOLOAD:=$(call AutoLoad,51,qca-nss-vlan)
-#endef
+define KernelPackage/qca-nss-drv-vlan-mgr
+  SECTION:=kernel
+  CATEGORY:=Kernel modules
+  SUBMENU:=Network Devices
+  TITLE:=Kernel driver for NSS VLAN manager
+  DEPENDS:=@TARGET_ipq806x||TARGET_ipq_ipq806x||TARGET_ipq_ipq807x||TARGET_ipq807x||TARGET_ipq_ipq60xx||TARGET_ipq_ipq60xx_64||TARGET_ipq60xx \
+		+PACKAGE_kmod-qca-nss-drv:kmod-qca-nss-drv \
+		+@NSS_DRV_VLAN_ENABLE \
+		+PACKAGE_kmod-bonding:kmod-bonding
+  FILES:=$(PKG_BUILD_DIR)/vlan/qca-nss-vlan.ko
+  AUTOLOAD:=$(call AutoLoad,51,qca-nss-vlan)
+endef
 
-#define KernelPackage/qca-nss-drv-vlan-mgr/description
-#Kernel modules for NSS vlan manager
-#endef
+define KernelPackage/qca-nss-drv-vlan-mgr/description
+Kernel modules for NSS VLAN manager
+endef
 
 define KernelPackage/qca-nss-drv-qdisc
   SECTION:=kernel
@@ -419,9 +419,9 @@ endif
 #endif
 #endif
 
-#ifneq ($(CONFIG_PACKAGE_kmod-qca-nss-drv-vlan-mgr),)
-#MAKE_OPTS+=vlan-mgr=y
-#endif
+ifneq ($(CONFIG_PACKAGE_kmod-qca-nss-drv-vlan-mgr),)
+MAKE_OPTS+=vlan-mgr=y
+endif
 
 #ifneq ($(CONFIG_PACKAGE_kmod-qca-nss-drv-lag-mgr),)
 #MAKE_OPTS+=lag-mgr=y
@@ -486,7 +486,7 @@ $(eval $(call KernelPackage,qca-nss-drv-igs))
 #$(eval $(call KernelPackage,qca-nss-drv-portifmgr))
 $(eval $(call KernelPackage,qca-nss-drv-netlink))
 #$(eval $(call KernelPackage,qca-nss-drv-bridge-mgr))
-#$(eval $(call KernelPackage,qca-nss-drv-vlan-mgr))
+$(eval $(call KernelPackage,qca-nss-drv-vlan-mgr))
 #$(eval $(call KernelPackage,qca-nss-drv-lag-mgr))
 #$(eval $(call KernelPackage,qca-nss-drv-gre))
 #$(eval $(call KernelPackage,qca-nss-drv-pvxlanmgr))
