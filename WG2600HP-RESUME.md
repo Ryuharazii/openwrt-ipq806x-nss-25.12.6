@@ -116,3 +116,9 @@
 - **既に存在するGMAC/DSA対応**: `package/qca-nss/qca-nss-gmac/patches/09-dsa-conduit-device-tree-node.patch`が`netdev->dev.of_node = pdev->dev.of_node`を設定する。OpenWrt 711-03には`.port_change_conduit`。現行の`wan→eth0`/`lan→eth1`設定も存在するため、これらを無視して新たな別構成に置き換えない。
 - **次の横断確認対象**: 現行pinの`nss_cmn_get_interface_number_by_dev`とデータプレーン登録、ECM hierarchical iface resolution、QCAヘッダのNSSファームウェア側解釈・`eth_rx_unknown_l3_protocol`実カウンター、CPU0/6のL2分離、IPv4/固定IPIP6/Wi-Fiの相互影響。追加VLAN設定を要求しない。障害が2つある可能性を踏まえ、局所変更だけでPASSにしない。
 - **判定**: 今回はGitHub作業版/公式Linux6.12.112/公開NSS類似実装のソース横断照合のみ。現行pinソース直接比較・QEMU/電源投入→起動完了・ARMコンパイル・新RAM実機試験・NSS高速化の検証は未実施。G1/G2未完了、G3 FAIL。**新パッチ統合・ビルド・フラッシュなし**。
+
+## 2026-11-02 第25セッション継続点
+
+- 隔離DSA候補760-10のVLAN追加途中失敗時復旧を逆順へ修正（commit `5b287581`）。Linux v6.12.112の実ソースにunified diff2ハンクが一意適用され、同版の逆順走査マクロ存在も確認。修正結果は`WG2600HP-EXECUTION-GATES.md`の2026-11-02追記に保存。
+- 通常ブランチ・ユーザー用VLAN・実機ファームは未変更。G3 FAIL、ARMビルド/起動/オフロードは未確認。
+- 次は隔離760-02/03/04/05/07と既存711系の連携、pinned ECMの`lan1/wan`→NSS物理IF解決、NSS VLAN機能とQCA8337二CPU分離を修正優先で処理。既知のWi-Fi/TUNIPIP6組込み確認を再実施しない。
