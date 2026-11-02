@@ -153,10 +153,10 @@ config NSS_DRV_VIRT_IF_ENABLE
 	bool
 	default y
 	prompt "Enable VIRT_IF"
-#config NSS_DRV_VLAN_ENABLE
-#	bool
-#	default n
-#	prompt "Enable VLAN (ipq807x)"
+config NSS_DRV_VLAN_ENABLE
+	bool
+	default n
+	prompt "Enable NSS VLAN driver (including ipq806x)"
 #config NSS_DRV_VXLAN_ENABLE
 #	bool
 #	default n
