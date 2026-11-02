@@ -18,6 +18,6 @@ Do not flash. G1/G2 unresolved, G3 FAIL until all patch stack and API dependenci
 
 ## Kernel patch order: baseline source-context simulation
 
-- The integrated Linux patch sequence tested against upstream Linux 6.12.112 was generic `711-01`, `711-02`, `711-03`, **`712`**, `760-01`, then ipq806x `760-02`, `760-03`, `760-06`, `760-08`, `760-09`, `760-10`. All **49** hunks matched and were transformed in memory using old/new unified-diff context. This is a source-context simulation, **not** the OpenWrt quilt/ARM build.
+- The integrated Linux patch sequence tested against upstream Linux 6.12.112 was generic `711-01`, `711-02`, `711-03`, **`712`**, `760-01`, then ipq806x `760-02`, `760-03`, `760-06`, `760-08`, `760-09`, `760-10`. All **50** hunks matched and were transformed in memory using old/new unified-diff context. This is a source-context simulation, **not** the OpenWrt quilt/ARM build.
 - A first simulation erroneously omitted existing `712`, incorrectly suggesting that `760-02` conflicted with `711-03`. Including `712` removes that false failure. Another snippet in `760-02` at qca8k-common.c old line 881 matched two nearby locations; this simulation selected the position nearest the declared old location. The real patch utility has not independently confirmed this placement.
 - The ECM `390-04`/`390-05` patch stack has not been applied to the **exact** pinned ECM source together with `400`/`401`. No proof of kernel/ECM compile, NSS rule creation, firmware, RAM-boot or two-CPU datapath. G3 FAIL remains.
