@@ -331,3 +331,10 @@
 - **変更前の横断根拠**：Linux v6.12.112 `drivers/net/dsa/qca/qca8k-common.c` の `qca8k_vlan_add()` はVTU書込み、`qca8k_vlan_del()` は所属削除を担当し、`qca8k_port_vlan_add()` と同様にPVID書込みは後段で行われる。既存 `760-10` は先行ポート復旧を行うが、失敗した当該ポート内の部分更新には対応していなかった。
 - **変更後の確認範囲**：GitHub再取得の実パッチ `760-02` はunified diff全28ハンクのold/new行数整合PASS。元のエラー値を変更せず返却すること、VLAN削除前のPVID復元、復旧失敗のログ、VLAN-aware bridge時の復旧値をコード上で確認。これはソース整合の限定的確認であり、実パッチ適用・ARMコンパイル・HW書込み失敗注入・RAM起動のPASSではない。
 - **未解決のまま**：QCA8KのVLAN LOAD/書込自体の失敗による部分更新、復旧処理中の再失敗、他ポート/他スイッチ原子性、ECM DSA→NSS AE IF mapping、QCA/8021Qデータ転送、WAN/LAN二CPU分離、Wi-Fi NSS、固定IPIP6。G1/G2未確認、G3 FAILを維持。通常ブランチ、既存ファーム、実機設定は無変更。新ビルド・書込みなし。
+
+## 2026-11-02 第25セッション：ECM DSA階層の実装修正
+
+- **修正**：隔離版 `backports/staging/760-04-ecm-8021q-conduit-pinned-CANDIDATE.patch` で、`ecm_interface_vlan_real_dev()` が `VLAN upper → DSA user port → NSS conduit` のうちDSA userを飛ばす処理を修正した。通常VLANからは直下の実netdevへ1階層ずつ降り、8021Q DSA user portでだけGMACのconduitを返す。これにより明示VLANタグとDSA内部8021Qタグを別々のECMインターフェースとして保持する設計。修正コミット `d529fe86e1e810bac1e237b5232dab4d82f585f9`、後続パッチオフセット更新 `4cf3ab2ad4ab1b6fd52ceba38490ea866bdb9539`。
+- **依存・根拠**：Linux 6.12.112の `include/net/dsa.h` に `dsa_port_bridge_num_get` と `dsa_port_to_conduit`、`include/linux/dsa/8021q.h` にVLAN VID APIが存在。`net/dsa/dsa.c` の `dsa_port_from_netdev`、`net/dsa/user.c` の `dsa_user_dev_check`、`net/dsa/tag_8021q.c` のbridge/standalone VID APIは各々GPLエクスポートを確認。ただし pinned ECM `9acdcb05` の全ソースに対する実patch適用とARMコンパイルは未確認。
+- **回帰検出を実装**：`scripts/wg2600hp_cross_audit.py` に階層保持チェック（`9aaa128abc6cb2f6c591e0c44e47000baf4983a8`、`eb0918ac75f1930b2651abfe5e9a0ee269a02859`）、`tests/test_wg2600hp_cross_audit.py` に旧い階層短絡を復元するとFAILする負例（`6d6abeb22753afb5c5deb83bfed24e2cbd945cde`）を追加。GitHubからパッチ・監査・テストを読み戻し、コード要件の陽性・負例判定をJS文字列ベースで確認。Python unittest自体は未実行でPASSとはしていない。
+- **境界**：WAN→eth0、LAN→eth1の既存設定を保持。通常作業ブランチ未変更、ユーザー用VLAN追加なし。既存の `AE IF=-1` / `FAIL_RULE=-2` / `NSS IPv4 CREATE=0` を修正版実機で解消した証拠は未取得。NSS VLAN機能、QCA8337二CPU分離、Wi-Fi NSS、固定IPIP6は未解決。G1/G2未完了、G3 FAIL。新規ARMビルド・RAM起動・書込みは行っていない。
