@@ -28,7 +28,7 @@ operation of all features.
 
 The device-specific configuration is available at:
 
-configs/wg2600hp3.config
+configs/wg2600hp3-public.config
 
 ## Credits
 
@@ -54,3 +54,5 @@ stability, performance, or functionality.
 
 - [Build instructions](BUILDING.md)
 - [Known issues](KNOWN_ISSUES.md)
+
+- [Test environment](TEST_ENVIRONMENT.md)
