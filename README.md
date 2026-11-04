@@ -54,6 +54,21 @@ ACwifidude/openwrt       R7800 NSS for OpenWrt 22.03 / 23.05 (kernel 5.10–5.15
 The NSS code was not merged from git history. It was carried over commit by
 commit, so this branch descends from OpenWrt 25.12, not from the 24.10 fork.
 
+## Acknowledgements for the NEC Aterm work
+
+Special thanks to **Karin (Karin-Laboratory)** for creating and publishing
+[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss)
+to support WG2600HP NSS development. Their help has been an important part of
+moving this effort forward.
+
+### AI assistance
+
+The NEC Aterm work has received assistance with development planning, research,
+and documentation from:
+
+- ChatGPT (Choppy) — OpenAI
+- Claude (Kurolin) — Anthropic
+
 ## What was changed
 
 ### Port to 25.12 and Linux 6.12
