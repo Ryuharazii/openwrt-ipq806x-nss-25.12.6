@@ -49,3 +49,8 @@ No warranty is provided regarding safety,
 stability, performance, or functionality.
 
 **Use at your own risk.**
+
+## Documentation
+
+- [Build instructions](BUILDING.md)
+- [Known issues](KNOWN_ISSUES.md)
