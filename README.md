@@ -33,6 +33,20 @@
 元の開発者、開発履歴、謝辞については
 [README.nss-original.md](README.nss-original.md) を参照してください。
 
+## 謝辞
+
+WG2600HPのNSS対応に向けて
+[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss)
+を作成・公開してくださった **Karin氏（Karin-Laboratory）** に、心より感謝します。
+そのご協力が、この取り組みを進める大きな支えになりました。
+
+### AI支援
+
+開発の検討、調査、ドキュメント作成にあたり、以下のAIアシスタントの支援を受けています。
+
+- ChatGPT (Choppy) — OpenAI
+- Claude (Kurolin) — Anthropic
+
 ## 注意事項
 
 このファームウェアはOpenWrt公式のリリースではありません。
