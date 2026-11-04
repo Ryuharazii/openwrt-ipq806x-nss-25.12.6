@@ -45,7 +45,7 @@ meraki,mr52)
 nec,wg2600hp)
 	ucidef_set_led_wlan "wlan2g" "WLAN2G" "green:wlan2g" "phy1tpt"
 	ucidef_set_led_wlan "wlan5g" "WLAN5G" "green:wlan5g" "phy0tpt"
-	ucidef_set_led_switch "wan" "WAN" "green:active" "switch0" "0x2"
+	ucidef_set_led_netdev "wan" "WAN" "green:active" "eth0.2"
 	;;
 nec,wg2600hp3)
 	ucidef_set_led_switch "wan" "WAN" "green:active" "switch0" "0x2"
