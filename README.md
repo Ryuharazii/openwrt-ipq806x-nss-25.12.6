@@ -7,15 +7,27 @@ Experimental firmware branches for NEC Aterm devices:
 - [WG2600HP](../../tree/wg2600hp-swconfig-integration-20261102)
 - [WG2600HP3](../../tree/wg2600hp3-nss-25.12.6-release)
 
-Please review the README and KNOWN_ISSUES.md in each branch before use.
+Hardware status reported as of November 4, 2026:
+
+- **WG2600HP:** currently running on hardware; increasing NSS TUNIPIP6 counters
+  have been confirmed. Intermittent wired LAN disconnections and temporary loss
+  of the IPv4 default route remain unresolved known issues.
+- **WG2600HP3:** flashed with `sysupgrade` and tested on hardware, rather than
+  booted only in RAM. NSS offloading for IPIP6 on this device remains unverified
+  (UNTESTED).
+
+These observations do not establish full feature validation or long-term
+stability for either device. Please review the README and KNOWN_ISSUES.md in
+each branch before use.
 
 This repository contains OpenWrt **25.12.6** (Linux **6.12.112**, mac80211 backports
 6.18.55) with the Qualcomm **NSS** (Network Subsystem) hardware offload for the
 **ipq806x** platform (IPQ8064/IPQ8065). It targets the Netgear R7800 and the
 TP-Link Archer C2600.
 
-So far it has been tested on real hardware **only on the TP-Link Archer C2600**.
-The R7800 build compiles but has not been booted yet.
+The upstream hardware measurements below cover the **TP-Link Archer C2600**.
+The R7800 build compiles but has not been booted yet. NEC Aterm hardware status
+is described separately above; the C2600 results do not validate those devices.
 
 The original OpenWrt README is kept as [README.openwrt.md](README.openwrt.md).
 
@@ -66,8 +78,8 @@ moving this effort forward.
 The NEC Aterm work has received assistance with development planning, research,
 and documentation from:
 
-- ChatGPT (Choppy) — OpenAI
-- Claude (Kurolin) — Anthropic
+- Choppie
+- Kurorин
 
 ## What was changed
 
