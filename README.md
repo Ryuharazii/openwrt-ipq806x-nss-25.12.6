@@ -68,10 +68,7 @@ commit, so this branch descends from OpenWrt 25.12, not from the 24.10 fork.
 
 ## Acknowledgements for the NEC Aterm work
 
-Special thanks to **Karin (Karin-Laboratory)** for creating and publishing
-[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss)
-to support WG2600HP NSS development. Their help has been an important part of
-moving this effort forward.
+Special thanks to **Karin (Karin-Laboratory)** for responding to a request for help on 5channel and creating and publishing [wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss). That kindness and support became the starting point of this project. I am deeply grateful.
 
 ### AI assistance
 
