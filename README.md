@@ -1,5 +1,14 @@
 # OpenWrt 25.12 with Qualcomm NSS offload for ipq806x
 
+## NEC Aterm WG2600HP / WG2600HP3
+
+Experimental firmware branches for NEC Aterm devices:
+
+- [WG2600HP](../../tree/wg2600hp-swconfig-integration-20261102)
+- [WG2600HP3](../../tree/wg2600hp3-nss-25.12.6-release)
+
+Please review the README and KNOWN_ISSUES.md in each branch before use.
+
 This repository contains OpenWrt **25.12.6** (Linux **6.12.112**, mac80211 backports
 6.18.55) with the Qualcomm **NSS** (Network Subsystem) hardware offload for the
 **ipq806x** platform (IPQ8064/IPQ8065). It targets the Netgear R7800 and the
