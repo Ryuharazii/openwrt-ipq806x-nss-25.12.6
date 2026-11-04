@@ -451,6 +451,9 @@
 };
 
 &gmac1 {
+	qcom,phy-mdio-addr = <32>;
+	qcom,poll-required = <0>;
+	qcom,rgmii-delay = <1>;
 	status = "okay";
 
 	pinctrl-0 = <&rgmii2_pins>;
@@ -469,6 +472,9 @@
 };
 
 &gmac2 {
+	qcom,phy-mdio-addr = <32>;
+	qcom,poll-required = <0>;
+	qcom,rgmii-delay = <0>;
 	status = "okay";
 	phy-mode = "sgmii";
 	qcom,id = <2>;
