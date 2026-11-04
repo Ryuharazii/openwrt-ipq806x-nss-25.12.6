@@ -72,8 +72,7 @@ Special thanks to **Karin (Karin-Laboratory)** for responding to a request for h
 
 ### AI assistance
 
-The NEC Aterm work has received assistance with development planning, research,
-and documentation from:
+The NEC Aterm project has received AI assistance throughout development, including research, testing, and documentation, from:
 
 - Choppie
 - Kurorин
