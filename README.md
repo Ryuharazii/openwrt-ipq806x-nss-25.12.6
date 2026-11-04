@@ -36,10 +36,9 @@
 
 ## 謝辞
 
-WG2600HPのNSS対応に向けて
-[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss)
-を作成・公開してくださった **Karin氏（Karin-Laboratory）** に、心より感謝します。
-そのご協力が、この取り組みを進める大きな支えになりました。
+5ちゃんねるでの呼びかけに応じ、[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss) を作成・公開してくださった **Karin氏（Karin-Laboratory）** に、心より感謝します。
+
+そのご厚意とご協力が、このプロジェクトの出発点となりました。本当にありがとうございました。
 
 ### AI支援
 
