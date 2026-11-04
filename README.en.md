@@ -15,14 +15,16 @@
 The firmware image was successfully built on Ubuntu
 on November 4, 2026.
 
-Successful compilation does not guarantee correct
-operation of all features.
+The device is currently running on hardware, and increasing NSS TUNIPIP6
+counters for IPIP6 have been confirmed, as reported by the operator.
+This does not establish full feature validation or long-term stability.
 
 ## Known Issues and Limitations
 
-- NSS hardware offloading for IPIP6 tunnels is unverified.
 - Intermittent network connectivity issues have been observed during startup.
-- Long-term stability and security have not been fully evaluated.
+- Intermittent wired LAN disconnections during operation and temporary loss of the IPv4 default route remain unresolved known issues; their causes are unknown.
+- TUNIPIP6 statistics patch 405 has been reviewed at source-code level only; its effect on hardware remains unverified (UNTESTED).
+- Full feature validation is incomplete. Long-term stability is unverified (UNTESTED), and security testing is incomplete.
 
 ## Build Configuration
 
@@ -37,6 +39,21 @@ This project is based on existing OpenWrt NSS development work.
 The original project information, contributors,
 development history, and acknowledgments are preserved in
 [README.nss-original.md](README.nss-original.md).
+
+## Acknowledgements for the NEC Aterm work
+
+Special thanks to **Karin (Karin-Laboratory)** for creating and publishing
+[wg2600hp-openwrt-nss](https://github.com/Karin-Laboratory/wg2600hp-openwrt-nss)
+to support WG2600HP NSS development. Their help has been an important part of
+moving this effort forward.
+
+### AI assistance
+
+The NEC Aterm work has received assistance with development planning, research,
+and documentation from:
+
+- Choppie
+- Kurorин
 
 ## Disclaimer
 
