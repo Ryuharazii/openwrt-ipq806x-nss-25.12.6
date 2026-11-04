@@ -9,6 +9,8 @@
 - IPv4接続方式：IPv4 over IPv6（IPIP6）
 
 ### 検証状況
+- 実機に `sysupgrade` で書き込んで試験済み（使用者からの報告）。RAM起動ではない
+- 全機能の検証は未完了、長期安定性は未検証（UNTESTED）
 - 実機でIPv4・IPv6接続を確認
 - 起動時に通信が不安定になる事象あり
 - IPIP6のNSSオフロードは未検証
@@ -27,6 +29,8 @@
 - IPv4 connection: IPv4 over IPv6 (IPIP6)
 
 ### Test Status
+- Flashed with `sysupgrade` and tested on hardware, as reported by the operator; this was not a RAM-boot test
+- Full feature validation is incomplete, and long-term stability is unverified (UNTESTED)
 - IPv4 and IPv6 connectivity observed on hardware
 - Intermittent connectivity issues during startup
 - NSS acceleration for IPIP6 remains unverified
