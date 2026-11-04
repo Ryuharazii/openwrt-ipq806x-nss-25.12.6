@@ -6,7 +6,7 @@
 
 - 起動時にネットワーク接続が不安定になる場合があります。
 - IPIP6トンネルのNSSオフロード動作は未確認です。
-- WG2600HPのTUNIPIP6統計修正パッチ405は、ソースコード上の確認のみ完了しています。
+- WG2600HP3でのTUNIPIP6統計の正確性は未検証です。
 - 長期安定性とセキュリティの検証は未完了です。
 - これらの問題の根本原因は確定していません。
 
@@ -16,6 +16,6 @@ This firmware is an unofficial experimental build.
 
 - Intermittent network connectivity issues may occur during startup.
 - NSS offloading for IPIP6 tunnels has not been verified.
-- Patch 405 for WG2600HP TUNIPIP6 statistics has been reviewed at source-code level only.
+- The accuracy of WG2600HP3 TUNIPIP6 statistics has not been verified.
 - Long-term stability and security testing are incomplete.
 - The root causes of these issues have not been conclusively identified.
