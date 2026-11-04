@@ -1,0 +1,20 @@
+diff --git a/net/weechat/Makefile b/net/weechat/Makefile
+index 94dfce5..d34ac1b 100644
+--- a/net/weechat/Makefile
++++ b/net/weechat/Makefile
+@@ -63,6 +63,7 @@ define Package/weechat-minimal
+   VARIANT:=minimal
+   DEFAULT_VARIANT:=1
+   PROVIDES:=weechat
++  CONFLICTS:=weechat-full
+ endef
+ 
+ define Package/weechat-minimal/description
+@@ -76,7 +77,6 @@ define Package/weechat-full
+   DEPENDS+= +libncurses
+   VARIANT:=full
+   PROVIDES:=weechat
+-  CONFLICTS:=weechat-minimal
+ endef
+ 
+ define Package/weechat-full/description
