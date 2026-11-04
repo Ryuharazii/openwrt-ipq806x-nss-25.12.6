@@ -18,7 +18,7 @@ sudo apt install -y build-essential clang bison flex gawk   gcc-multilib g++-mul
     cd openwrt-ipq806x-nss-25.12.6
     ./scripts/feeds update -a
     ./scripts/feeds install -a
-    cp configs/wg2600hp.config .config
+    cp configs/wg2600hp-public.config .config
     make defconfig
     make -j8
 
