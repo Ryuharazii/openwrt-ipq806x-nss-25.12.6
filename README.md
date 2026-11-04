@@ -24,7 +24,7 @@
 
 ## ビルド設定
 
-機種別の設定は `configs/wg2600hp.config` に保存しています。
+機種別の設定は `configs/wg2600hp-public.config` に保存しています。
 
 ## 元の開発プロジェクト
 
@@ -44,3 +44,5 @@
 
 - [ビルド手順](BUILDING.md)
 - [既知の問題](KNOWN_ISSUES.md)
+
+- [テスト環境](TEST_ENVIRONMENT.md)
